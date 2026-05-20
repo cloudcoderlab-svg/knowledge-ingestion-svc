@@ -1,0 +1,20 @@
+{
+  "domains": [
+    {
+      "name": "MDM",
+      "subdomains": [
+        "Workflow",
+        "Rulebase",
+        "DataModel"
+      ]
+    },
+    {
+      "name": "Integration",
+      "subdomains": [
+        "REST",
+        "Kafka",
+        "EMS"
+      ]
+    }
+  ]
+}

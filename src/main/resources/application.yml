@@ -1,0 +1,24 @@
+server:
+  port: 8080
+
+spanner:
+  project-id: app-lab-001
+  instance-id: inst-knowledge-engine
+  database-id: knowledge-engine-db
+
+gcp:
+  project-id: app-lab-001
+  pubsub:
+    subscription-id: gcs-ingestion-sub
+
+vertex:
+  project-id: ai-lab-001-494218
+  location: us-central1
+  model-name: gemini-2.5-flash
+  classification-model-name: gemini-2.5-flash
+  embedding-model-name: gemini-embedding-001
+
+ingestion:
+  chunk:
+    max-chars: 3000
+    overlap-chars: 300
