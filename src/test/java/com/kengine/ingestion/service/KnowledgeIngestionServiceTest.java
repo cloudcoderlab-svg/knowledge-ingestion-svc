@@ -29,7 +29,7 @@ class KnowledgeIngestionServiceTest {
   @Mock private SemanticClassificationService classificationService;
   @Mock private KnowledgeExtractionService knowledgeExtractionService;
   @Mock private EmbeddingService embeddingService;
-  @Mock private SpannerStorageService storageService;
+  @Mock private PostgresStorageService storageService;
   @Mock private DocumentChunker documentChunker;
   @Mock private Storage storage;
 

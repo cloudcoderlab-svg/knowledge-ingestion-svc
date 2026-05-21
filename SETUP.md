@@ -1,6 +1,6 @@
 # Knowledge Ingestion Service Setup
 
-This service ingests documents from GCS, chunks and classifies content with Vertex AI, creates per-chunk embeddings, extracts generic solution knowledge, and stores the knowledge in Cloud Spanner.
+This service ingests documents from GCS, chunks and classifies content with Vertex AI, creates per-chunk embeddings, extracts generic solution knowledge, and stores the knowledge in Cloud SQL for PostgreSQL with pgvector.
 
 It is intended to be the first-stage knowledge base for both normal development and migration workflows. Downstream MCP/AGENT services can query source chunks and generic facts, then perform task-specific generation such as LLD, test cases, code scaffolding, epic/story generation, or TIBCO-specific migration extraction.
 
@@ -12,10 +12,12 @@ It is intended to be the first-stage knowledge base for both normal development 
   - `C:\root\lab\ai-lab\knowledge-engine\sa-knowledge-engine.json`
 - GCS bucket:
   - `knowledge-ingestion-bucket-app-lab-001`
-- Cloud Spanner:
-  - Project: `app-lab-001`
-  - Instance: `inst-knowledge-engine`
-  - Database: `knowledge-engine-db`
+- Cloud SQL for PostgreSQL:
+  - Instance: `appdata-inst-001`
+  - Database: `kengine-db`
+  - Schema: `knowledge`
+  - User: `kengine-app`
+  - pgvector enabled
 - Vertex AI model project:
   - Project: `ai-lab-001-494218`
   - Location: `us-central1`
@@ -44,16 +46,27 @@ ingestion:
     overlap-chars: 300
 ```
 
-Expected Spanner configuration:
+Expected Cloud SQL configuration:
 
 ```yaml
-spanner:
-  project-id: app-lab-001
-  instance-id: inst-knowledge-engine
-  database-id: knowledge-engine-db
+spring:
+  datasource:
+    url: jdbc:postgresql://${KENGINE_DB_HOST:localhost}:${KENGINE_DB_PORT:5432}/${KENGINE_DB_NAME:kengine-db}
+    username: ${KENGINE_DB_USER:kengine-app}
+    password: ${KENGINE_DB_PASSWORD:}
+  liquibase:
+    change-log: classpath:/db/changelog/db.changelog-master.yaml
+
+cloudsql:
+  instance-id: appdata-inst-001
+  database: kengine-db
+  schema: knowledge
+  user: kengine-app
 ```
 
-The Spanner schema includes:
+Liquibase manages the PostgreSQL schema in `src/main/resources/db/changelog`.
+
+The Cloud SQL schema includes:
 
 - `knowledge.ingestion_documents`
 - `knowledge.semantic_chunks`
@@ -64,6 +77,8 @@ The Spanner schema includes:
 - `knowledge.deployment_resources`
 - `knowledge.knowledge_relationships`
 - `knowledge.knowledge_notes`
+- `knowledge.usage_profiles`
+- `knowledge.resource_cost_estimates`
 
 Duplicate GCS notifications for the same bucket, object, and parsed content hash are skipped before classification, embedding, and extraction calls.
 
@@ -82,7 +97,7 @@ It needs access in both projects.
 In `app-lab-001`, grant permissions for:
 
 - GCS read/write on `knowledge-ingestion-bucket-app-lab-001`
-- Cloud Spanner writes and reads on `knowledge-engine-db`
+- Cloud SQL connection access to `kengine-db`
 
 In `ai-lab-001-494218`, grant Vertex AI invocation:
 
@@ -131,7 +146,7 @@ The real GCP integration test is skipped by default unless explicitly enabled.
 
 ## Run Real GCP Integration Test
 
-This test makes real calls to GCS, Vertex AI, and Spanner. It uploads a dummy document, ingests it, chunks and classifies it, creates embeddings, saves to Spanner, then verifies the Spanner row has a non-empty embedding.
+This test makes real calls to GCS, Vertex AI, and Cloud SQL. It uploads a dummy document, ingests it, chunks and classifies it, creates embeddings, saves to PostgreSQL/pgvector, then verifies the row has a non-empty embedding.
 
 From `knowledge-engine/knowledge-ingestion-svc`:
 
@@ -139,6 +154,11 @@ From `knowledge-engine/knowledge-ingestion-svc`:
 $env:GOOGLE_APPLICATION_CREDENTIALS='C:\root\lab\ai-lab\knowledge-engine\sa-knowledge-engine.json'
 $env:RUN_REAL_GCP_INTEGRATION_TESTS='true'
 $env:INTEGRATION_GCS_BUCKET='knowledge-ingestion-bucket-app-lab-001'
+$env:KENGINE_DB_HOST='localhost'
+$env:KENGINE_DB_PORT='5432'
+$env:KENGINE_DB_NAME='kengine-db'
+$env:KENGINE_DB_USER='kengine-app'
+$env:KENGINE_DB_PASSWORD='<database-password>'
 $env:JAVA_TOOL_OPTIONS='-Djavax.net.ssl.trustStoreType=Windows-ROOT -Djavax.net.ssl.trustStore=NONE'
 
 .\gradlew test --rerun-tasks --tests com.kengine.ingestion.service.KnowledgeIngestionRealGcpIntegrationTest
@@ -158,6 +178,11 @@ From `knowledge-engine/knowledge-ingestion-svc`:
 
 ```powershell
 $env:GOOGLE_APPLICATION_CREDENTIALS='C:\root\lab\ai-lab\knowledge-engine\sa-knowledge-engine.json'
+$env:KENGINE_DB_HOST='localhost'
+$env:KENGINE_DB_PORT='5432'
+$env:KENGINE_DB_NAME='kengine-db'
+$env:KENGINE_DB_USER='kengine-app'
+$env:KENGINE_DB_PASSWORD='<database-password>'
 $env:JAVA_TOOL_OPTIONS='-Djavax.net.ssl.trustStoreType=Windows-ROOT -Djavax.net.ssl.trustStore=NONE'
 
 .\gradlew bootRun
@@ -216,10 +241,10 @@ Gemini may return JSON inside Markdown fences even when prompted for JSON. The s
 
 Real model responses may return arrays for `businessCapability` or `technicalCapability`. `SemanticClassificationService` normalizes those fields to comma-separated strings before mapping to `ClassificationResult`.
 
-### Spanner query parameter errors
+### Cloud SQL connectivity
 
-The Spanner database uses PostgreSQL dialect. Avoid GoogleSQL-style named parameters in ad hoc verification queries unless tested against this dialect.
+For local runs, point `KENGINE_DB_HOST` and `KENGINE_DB_PORT` at a reachable Cloud SQL endpoint. If using the Cloud SQL Auth Proxy, start the proxy for instance `appdata-inst-001` on local port `5432`, then use the defaults above.
 
 ### GCS cleanup
 
-The real integration test deletes the uploaded dummy GCS object after the run. It does not delete Spanner rows, so test rows remain available for audit/debugging.
+The real integration test deletes the uploaded dummy GCS object after the run. It does not delete Cloud SQL rows, so test rows remain available for audit/debugging.

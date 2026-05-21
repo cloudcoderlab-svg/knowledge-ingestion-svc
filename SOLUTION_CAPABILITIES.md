@@ -2,7 +2,7 @@
 
 This service is the generic knowledge-base extractor for software delivery and migration programs.
 
-It is intentionally not tied only to TIBCO MDM. It can ingest source material from normal development projects and from legacy/BPM migration projects, extract generic knowledge, persist it in Spanner, and expose that knowledge to downstream MCP tools, AGENTS, and specialized extractor services.
+It is intentionally not tied only to TIBCO MDM. It can ingest source material from normal development projects and from legacy/BPM migration projects, extract generic knowledge, persist it in Cloud SQL for PostgreSQL with pgvector, and expose that knowledge to downstream MCP tools, AGENTS, and specialized extractor services.
 
 ## Core Positioning
 
@@ -14,7 +14,7 @@ It is intentionally not tied only to TIBCO MDM. It can ingest source material fr
               |
               v
 +-------------+---------------+
-| Spanner generic knowledge   |
+| Cloud SQL generic knowledge |
 | Chunks, embeddings, facts   |
 +-------------+---------------+
               |
@@ -62,7 +62,7 @@ knowledge-ingestion-svc
   |-- create embeddings
   |-- extract generic solution knowledge using LLM
   v
-Cloud Spanner
+Cloud SQL for PostgreSQL
 ```
 
 ## Generic Knowledge Extracted
@@ -156,7 +156,7 @@ Requirements / diagrams / design docs
   v
 knowledge-ingestion-svc
   v
-Spanner knowledge base
+Cloud SQL knowledge base
   v
 MCP tools
   v
@@ -210,7 +210,7 @@ knowledge-ingestion-svc
   |-- generic components
   |-- generic relationships
   v
-Spanner knowledge base
+Cloud SQL knowledge base
   v
 Specialized extractor service
   |
@@ -246,7 +246,7 @@ Specialized extractors should be separate services that consume the generic know
 
 ```text
 +--------------------------+
-| Spanner generic KB       |
+| Cloud SQL generic KB     |
 | chunks and generic facts |
 +------------+-------------+
              |
@@ -317,7 +317,7 @@ TIBCO MDM XML + docs + diagrams
   v
 knowledge-ingestion-svc
   v
-Spanner generic KB
+Cloud SQL generic KB
   |
   |-- sources tagged as tibco_mdm_xml
   |-- chunks with evidence text
@@ -366,7 +366,7 @@ BPMN files + process docs + diagrams
   v
 knowledge-ingestion-svc
   v
-Spanner generic KB
+Cloud SQL generic KB
   v
 BPMN extractor service
   |
@@ -472,7 +472,7 @@ Those belong in specialized extractor services.
                  |
                  v
 +----------------+------------------+
-| Spanner generic knowledge base    |
+| Cloud SQL generic knowledge base  |
 +----------------+------------------+
                  |
                  +-----------------------------------+

@@ -4,9 +4,6 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import com.google.cloud.spanner.DatabaseClient;
-import com.google.cloud.spanner.ResultSet;
-import com.google.cloud.spanner.Statement;
 import com.google.cloud.storage.BlobId;
 import com.google.cloud.storage.BlobInfo;
 import com.google.cloud.storage.BucketInfo;
@@ -14,29 +11,27 @@ import com.google.cloud.storage.Storage;
 import com.kengine.ingestion.dto.ClassificationResult;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
-import java.util.List;
+import java.util.Map;
 import java.util.UUID;
-import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.jdbc.core.JdbcTemplate;
 
 @SpringBootTest(
     properties = {"gcp.project-id=test-project", "gcp.pubsub.subscription-id=test-subscription"})
+@EnabledIfEnvironmentVariable(named = "RUN_REAL_GCP_INTEGRATION_TESTS", matches = "true")
 class KnowledgeIngestionRealGcpIntegrationTest {
 
   @Autowired private KnowledgeIngestionService ingestionService;
 
   @Autowired private Storage storage;
 
-  @Autowired private DatabaseClient databaseClient;
+  @Autowired private JdbcTemplate jdbcTemplate;
 
   @Test
   void ingestDummyDocumentWithRealGcpCalls() throws Exception {
-    Assumptions.assumeTrue(
-        Boolean.parseBoolean(System.getenv("RUN_REAL_GCP_INTEGRATION_TESTS")),
-        "Set RUN_REAL_GCP_INTEGRATION_TESTS=true to run real GCP integration tests");
-
     String bucket =
         firstNonBlank(
             System.getProperty("integration.gcs.bucket"), System.getenv("INTEGRATION_GCS_BUCKET"));
@@ -82,26 +77,23 @@ class KnowledgeIngestionRealGcpIntegrationTest {
       assertNotNull(result.getDomain());
       assertFalse(result.getDomain().isBlank());
 
-      Statement statement =
-          Statement.of(
-              "SELECT chunk_id, artifact_id, project_id, domain, subdomain, embedding "
-                  + "FROM knowledge.semantic_chunks "
-                  + "WHERE content LIKE '%"
-                  + marker
-                  + "%' "
-                  + "ORDER BY created_at DESC "
-                  + "LIMIT 1");
+      Map<String, Object> row =
+          jdbcTemplate.queryForMap(
+              """
+              SELECT chunk_id, artifact_id, project_id, domain, subdomain, embedding::text AS embedding
+              FROM knowledge.semantic_chunks
+              WHERE content LIKE ?
+              ORDER BY created_at DESC
+              LIMIT 1
+              """,
+              "%" + marker + "%");
 
-      try (ResultSet rows = databaseClient.singleUse().executeQuery(statement)) {
-        assertTrue(rows.next(), "Expected semantic_chunks row for marker " + marker);
-        assertFalse(rows.getString("chunk_id").isBlank());
-        assertFalse(rows.getString("artifact_id").isBlank());
-        assertTrue(projectId.equals(rows.getString("project_id")));
-        assertFalse(rows.getString("domain").isBlank());
-        List<Double> embedding = rows.getDoubleList("embedding");
-        assertNotNull(embedding);
-        assertFalse(embedding.isEmpty(), "Expected persisted embedding values");
-      }
+      assertFalse(row.get("chunk_id").toString().isBlank());
+      assertFalse(row.get("artifact_id").toString().isBlank());
+      assertTrue(projectId.equals(row.get("project_id")));
+      assertFalse(row.get("domain").toString().isBlank());
+      assertNotNull(row.get("embedding"));
+      assertFalse(row.get("embedding").toString().isBlank(), "Expected persisted embedding values");
     } finally {
       storage.delete(BlobId.of(bucket, objectName));
       if (createdBucket) {

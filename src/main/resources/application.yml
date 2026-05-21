@@ -1,10 +1,19 @@
 server:
   port: 8080
 
-spanner:
-  project-id: app-lab-001
-  instance-id: inst-knowledge-engine
-  database-id: knowledge-engine-db
+spring:
+  datasource:
+    url: jdbc:postgresql://${KENGINE_DB_HOST:localhost}:${KENGINE_DB_PORT:5432}/${KENGINE_DB_NAME:kengine-db}
+    username: ${KENGINE_DB_USER:kengine-app}
+    password: ${KENGINE_DB_PASSWORD:}
+  liquibase:
+    change-log: classpath:/db/changelog/db.changelog-master.yaml
+
+cloudsql:
+  instance-id: appdata-inst-001
+  database: kengine-db
+  schema: knowledge
+  user: kengine-app
 
 gcp:
   project-id: app-lab-001

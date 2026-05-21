@@ -2,14 +2,14 @@
 
 This document defines the recommended MCP tools that AGENTS should use to interact with the knowledge base for both normal software development and TIBCO MDM migration.
 
-The current service is the generic ingestion and knowledge source. It ingests source documents, extracts generic knowledge, stores chunks and facts in Spanner, and exposes retrieval endpoints. MCP tools can wrap these endpoints and add task-specific orchestration.
+The current service is the generic ingestion and knowledge source. It ingests source documents, extracts generic knowledge, stores chunks and facts in Cloud SQL for PostgreSQL with pgvector, and exposes retrieval endpoints. MCP tools can wrap these endpoints and add task-specific orchestration.
 
 ## High-Level Architecture
 
 ```text
 Docs / requirements / diagrams / XML
   -> knowledge-ingestion-svc
-  -> Spanner knowledge base
+  -> Cloud SQL PostgreSQL knowledge base
       -> semantic_chunks
       -> business_rules
       -> business_flows

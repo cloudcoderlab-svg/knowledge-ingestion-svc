@@ -24,7 +24,7 @@ public class KnowledgeIngestionService {
   private final SemanticClassificationService classificationService;
   private final KnowledgeExtractionService knowledgeExtractionService;
   private final EmbeddingService embeddingService;
-  private final SpannerStorageService storageService;
+  private final PostgresStorageService storageService;
   private final DocumentChunker documentChunker;
   private final Storage storage;
 
