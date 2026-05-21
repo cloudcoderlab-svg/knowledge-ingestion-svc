@@ -1,0 +1,38 @@
+server:
+  port: 8080
+
+logging:
+  level:
+    liquibase: DEBUG
+    org.springframework.boot.autoconfigure: DEBUG
+    org.springframework.jdbc.datasource: DEBUG
+
+spring:
+  datasource:
+    url: jdbc:postgresql://${KENGINE_DB_HOST:10.196.140.215}:${KENGINE_DB_PORT:5432}/${KENGINE_DB_NAME:kengine-db}
+    username: ${KENGINE_DB_USER:kengine_app}
+    password: ${KENGINE_DB_PASSWORD:Admin@123}
+  liquibase:
+    change-log: classpath:/db/changelog/db.changelog-master.yaml
+
+cloudsql:
+  instance-id: gpc-d-disc-postgresdb
+  database: kengine-db
+  schema: public
+  user: kengine_app
+
+gcp:
+  project-id: gpc-d-disc
+  pubsub:
+    subscription-id: kengine-knowledge-topic-sub
+
+vertex:
+  project-id: gpc-d-disc
+  location: us-central1
+  classification-model-name: gemini-2.5-flash
+  embedding-model-name: text-embedding-005
+
+ingestion:
+  chunk:
+    max-chars: 3000
+    overlap-chars: 300

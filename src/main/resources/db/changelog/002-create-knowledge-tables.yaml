@@ -1,0 +1,418 @@
+databaseChangeLog:
+  - changeSet:
+      id: 002-create-solution-components-table
+      author: system
+      changes:
+        - createTable:
+            tableName: solution_components
+            columns:
+              - column:
+                  name: component_id
+                  type: varchar(36)
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: project_id
+                  type: text
+                  constraints:
+                    nullable: false
+              - column:
+                  name: domain
+                  type: text
+              - column:
+                  name: subdomain
+                  type: text
+              - column:
+                  name: component_layer
+                  type: text
+                  constraints:
+                    nullable: false
+              - column:
+                  name: component_name
+                  type: text
+                  constraints:
+                    nullable: false
+              - column:
+                  name: component_type
+                  type: text
+                  constraints:
+                    nullable: false
+              - column:
+                  name: capability
+                  type: text
+              - column:
+                  name: responsibility
+                  type: text
+              - column:
+                  name: technology
+                  type: text
+              - column:
+                  name: owner
+                  type: text
+              - column:
+                  name: lifecycle
+                  type: text
+                  constraints:
+                    nullable: false
+              - column:
+                  name: source_artifact_id
+                  type: varchar(36)
+              - column:
+                  name: source_chunk_id
+                  type: varchar(36)
+              - column:
+                  name: confidence
+                  type: double precision
+              - column:
+                  name: created_at
+                  type: timestamptz
+              - column:
+                  name: updated_at
+                  type: timestamptz
+        - addForeignKeyConstraint:
+            baseTableName: solution_components
+            baseColumnNames: project_id
+            constraintName: fk_solution_component_project
+            referencedTableName: projects
+            referencedColumnNames: project_id
+        - addForeignKeyConstraint:
+            baseTableName: solution_components
+            baseColumnNames: source_artifact_id
+            constraintName: fk_solution_component_artifact
+            referencedTableName: artifacts
+            referencedColumnNames: artifact_id
+        - addForeignKeyConstraint:
+            baseTableName: solution_components
+            baseColumnNames: source_chunk_id
+            constraintName: fk_solution_component_chunk
+            referencedTableName: semantic_chunks
+            referencedColumnNames: chunk_id
+
+  - changeSet:
+      id: 002-create-business-rules-table
+      author: system
+      changes:
+        - createTable:
+            tableName: business_rules
+            columns:
+              - column:
+                  name: rule_id
+                  type: varchar(36)
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: project_id
+                  type: text
+                  constraints:
+                    nullable: false
+              - column:
+                  name: rule_name
+                  type: text
+                  constraints:
+                    nullable: false
+              - column:
+                  name: rule_type
+                  type: text
+                  constraints:
+                    nullable: false
+              - column:
+                  name: condition_text
+                  type: text
+              - column:
+                  name: outcome_text
+                  type: text
+              - column:
+                  name: source_business_component_name
+                  type: text
+              - column:
+                  name: priority
+                  type: text
+              - column:
+                  name: source_artifact_id
+                  type: varchar(36)
+              - column:
+                  name: source_chunk_id
+                  type: varchar(36)
+              - column:
+                  name: confidence
+                  type: double precision
+              - column:
+                  name: created_at
+                  type: timestamptz
+              - column:
+                  name: updated_at
+                  type: timestamptz
+        - addForeignKeyConstraint:
+            baseTableName: business_rules
+            baseColumnNames: project_id
+            constraintName: fk_business_rule_project
+            referencedTableName: projects
+            referencedColumnNames: project_id
+        - addForeignKeyConstraint:
+            baseTableName: business_rules
+            baseColumnNames: source_artifact_id
+            constraintName: fk_business_rule_artifact
+            referencedTableName: artifacts
+            referencedColumnNames: artifact_id
+        - addForeignKeyConstraint:
+            baseTableName: business_rules
+            baseColumnNames: source_chunk_id
+            constraintName: fk_business_rule_chunk
+            referencedTableName: semantic_chunks
+            referencedColumnNames: chunk_id
+
+  - changeSet:
+      id: 002-create-business-flows-table
+      author: system
+      changes:
+        - createTable:
+            tableName: business_flows
+            columns:
+              - column:
+                  name: flow_id
+                  type: varchar(36)
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: project_id
+                  type: text
+                  constraints:
+                    nullable: false
+              - column:
+                  name: flow_name
+                  type: text
+                  constraints:
+                    nullable: false
+              - column:
+                  name: trigger_text
+                  type: text
+              - column:
+                  name: outcome_text
+                  type: text
+              - column:
+                  name: owner
+                  type: text
+              - column:
+                  name: source_artifact_id
+                  type: varchar(36)
+              - column:
+                  name: source_chunk_id
+                  type: varchar(36)
+              - column:
+                  name: confidence
+                  type: double precision
+              - column:
+                  name: created_at
+                  type: timestamptz
+              - column:
+                  name: updated_at
+                  type: timestamptz
+        - addForeignKeyConstraint:
+            baseTableName: business_flows
+            baseColumnNames: project_id
+            constraintName: fk_business_flow_project
+            referencedTableName: projects
+            referencedColumnNames: project_id
+        - addForeignKeyConstraint:
+            baseTableName: business_flows
+            baseColumnNames: source_artifact_id
+            constraintName: fk_business_flow_artifact
+            referencedTableName: artifacts
+            referencedColumnNames: artifact_id
+        - addForeignKeyConstraint:
+            baseTableName: business_flows
+            baseColumnNames: source_chunk_id
+            constraintName: fk_business_flow_chunk
+            referencedTableName: semantic_chunks
+            referencedColumnNames: chunk_id
+
+  - changeSet:
+      id: 002-create-business-flow-steps-table
+      author: system
+      changes:
+        - createTable:
+            tableName: business_flow_steps
+            columns:
+              - column:
+                  name: step_id
+                  type: varchar(36)
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: flow_id
+                  type: varchar(36)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: sequence_number
+                  type: bigint
+              - column:
+                  name: step_name
+                  type: text
+              - column:
+                  name: actor
+                  type: text
+              - column:
+                  name: action_text
+                  type: text
+              - column:
+                  name: input_text
+                  type: text
+              - column:
+                  name: output_text
+                  type: text
+              - column:
+                  name: next_step
+                  type: text
+              - column:
+                  name: created_at
+                  type: timestamptz
+        - addForeignKeyConstraint:
+            baseTableName: business_flow_steps
+            baseColumnNames: flow_id
+            constraintName: fk_business_flow_step_flow
+            referencedTableName: business_flows
+            referencedColumnNames: flow_id
+
+  - changeSet:
+      id: 002-create-knowledge-relationships-table
+      author: system
+      changes:
+        - createTable:
+            tableName: knowledge_relationships
+            columns:
+              - column:
+                  name: relationship_id
+                  type: varchar(36)
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: project_id
+                  type: text
+                  constraints:
+                    nullable: false
+              - column:
+                  name: source_name
+                  type: text
+                  constraints:
+                    nullable: false
+              - column:
+                  name: source_type
+                  type: text
+                  constraints:
+                    nullable: false
+              - column:
+                  name: source_ref_id
+                  type: varchar(36)
+              - column:
+                  name: target_name
+                  type: text
+                  constraints:
+                    nullable: false
+              - column:
+                  name: target_type
+                  type: text
+                  constraints:
+                    nullable: false
+              - column:
+                  name: target_ref_id
+                  type: varchar(36)
+              - column:
+                  name: relationship_type
+                  type: text
+                  constraints:
+                    nullable: false
+              - column:
+                  name: context
+                  type: text
+              - column:
+                  name: source_artifact_id
+                  type: varchar(36)
+              - column:
+                  name: source_chunk_id
+                  type: varchar(36)
+              - column:
+                  name: confidence
+                  type: double precision
+              - column:
+                  name: created_at
+                  type: timestamptz
+        - addForeignKeyConstraint:
+            baseTableName: knowledge_relationships
+            baseColumnNames: project_id
+            constraintName: fk_knowledge_relationship_project
+            referencedTableName: projects
+            referencedColumnNames: project_id
+        - addForeignKeyConstraint:
+            baseTableName: knowledge_relationships
+            baseColumnNames: source_artifact_id
+            constraintName: fk_knowledge_relationship_artifact
+            referencedTableName: artifacts
+            referencedColumnNames: artifact_id
+        - addForeignKeyConstraint:
+            baseTableName: knowledge_relationships
+            baseColumnNames: source_chunk_id
+            constraintName: fk_knowledge_relationship_chunk
+            referencedTableName: semantic_chunks
+            referencedColumnNames: chunk_id
+
+  - changeSet:
+      id: 002-create-knowledge-notes-table
+      author: system
+      changes:
+        - createTable:
+            tableName: knowledge_notes
+            columns:
+              - column:
+                  name: note_id
+                  type: varchar(36)
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: project_id
+                  type: text
+                  constraints:
+                    nullable: false
+              - column:
+                  name: note_type
+                  type: text
+                  constraints:
+                    nullable: false
+              - column:
+                  name: note_text
+                  type: text
+                  constraints:
+                    nullable: false
+              - column:
+                  name: source_artifact_id
+                  type: varchar(36)
+              - column:
+                  name: source_chunk_id
+                  type: varchar(36)
+              - column:
+                  name: created_at
+                  type: timestamptz
+        - addForeignKeyConstraint:
+            baseTableName: knowledge_notes
+            baseColumnNames: project_id
+            constraintName: fk_knowledge_note_project
+            referencedTableName: projects
+            referencedColumnNames: project_id
+        - addForeignKeyConstraint:
+            baseTableName: knowledge_notes
+            baseColumnNames: source_artifact_id
+            constraintName: fk_knowledge_note_artifact
+            referencedTableName: artifacts
+            referencedColumnNames: artifact_id
+        - addForeignKeyConstraint:
+            baseTableName: knowledge_notes
+            baseColumnNames: source_chunk_id
+            constraintName: fk_knowledge_note_chunk
+            referencedTableName: semantic_chunks
+            referencedColumnNames: chunk_id

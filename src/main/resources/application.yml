@@ -12,20 +12,19 @@ spring:
 cloudsql:
   instance-id: appdata-inst-001
   database: kengine-db
-  schema: knowledge
+  schema: public
   user: kengine-app
 
 gcp:
   project-id: app-lab-001
   pubsub:
-    subscription-id: gcs-ingestion-sub
+    subscription-id: kengine-knowledge-topic-sub
 
 vertex:
   project-id: ai-lab-001-494218
   location: us-central1
-  model-name: gemini-2.5-flash
   classification-model-name: gemini-2.5-flash
-  embedding-model-name: gemini-embedding-001
+  embedding-model-name: text-embedding-005
 
 ingestion:
   chunk:

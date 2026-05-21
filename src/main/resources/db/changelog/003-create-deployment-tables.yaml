@@ -1,0 +1,318 @@
+databaseChangeLog:
+  - changeSet:
+      id: 003-create-deployment-resources-table
+      author: system
+      changes:
+        - createTable:
+            tableName: deployment_resources
+            columns:
+              - column:
+                  name: resource_id
+                  type: varchar(36)
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: project_id
+                  type: text
+                  constraints:
+                    nullable: false
+              - column:
+                  name: domain
+                  type: text
+              - column:
+                  name: subdomain
+                  type: text
+              - column:
+                  name: resource_name
+                  type: text
+                  constraints:
+                    nullable: false
+              - column:
+                  name: resource_type
+                  type: text
+                  constraints:
+                    nullable: false
+              - column:
+                  name: provider
+                  type: text
+                  constraints:
+                    nullable: false
+              - column:
+                  name: hosting_model
+                  type: text
+                  constraints:
+                    nullable: false
+              - column:
+                  name: environment
+                  type: text
+                  constraints:
+                    nullable: false
+              - column:
+                  name: region
+                  type: text
+              - column:
+                  name: criticality
+                  type: text
+              - column:
+                  name: lifecycle
+                  type: text
+                  constraints:
+                    nullable: false
+              - column:
+                  name: source_artifact_id
+                  type: varchar(36)
+              - column:
+                  name: source_chunk_id
+                  type: varchar(36)
+              - column:
+                  name: confidence
+                  type: double precision
+              - column:
+                  name: created_at
+                  type: timestamptz
+              - column:
+                  name: updated_at
+                  type: timestamptz
+        - addForeignKeyConstraint:
+            baseTableName: deployment_resources
+            baseColumnNames: project_id
+            constraintName: fk_deployment_resource_project
+            referencedTableName: projects
+            referencedColumnNames: project_id
+        - addForeignKeyConstraint:
+            baseTableName: deployment_resources
+            baseColumnNames: source_artifact_id
+            constraintName: fk_deployment_resource_artifact
+            referencedTableName: artifacts
+            referencedColumnNames: artifact_id
+        - addForeignKeyConstraint:
+            baseTableName: deployment_resources
+            baseColumnNames: source_chunk_id
+            constraintName: fk_deployment_resource_chunk
+            referencedTableName: semantic_chunks
+            referencedColumnNames: chunk_id
+
+  - changeSet:
+      id: 003-create-deployment-resource-configs-table
+      author: system
+      changes:
+        - createTable:
+            tableName: deployment_resource_configs
+            columns:
+              - column:
+                  name: config_id
+                  type: varchar(36)
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: resource_id
+                  type: varchar(36)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: config_key
+                  type: text
+                  constraints:
+                    nullable: false
+              - column:
+                  name: config_value
+                  type: text
+                  constraints:
+                    nullable: false
+              - column:
+                  name: unit
+                  type: text
+              - column:
+                  name: source_chunk_id
+                  type: varchar(36)
+              - column:
+                  name: created_at
+                  type: timestamptz
+        - addForeignKeyConstraint:
+            baseTableName: deployment_resource_configs
+            baseColumnNames: resource_id
+            constraintName: fk_deployment_resource_config_resource
+            referencedTableName: deployment_resources
+            referencedColumnNames: resource_id
+        - addForeignKeyConstraint:
+            baseTableName: deployment_resource_configs
+            baseColumnNames: source_chunk_id
+            constraintName: fk_deployment_resource_config_chunk
+            referencedTableName: semantic_chunks
+            referencedColumnNames: chunk_id
+
+  - changeSet:
+      id: 003-create-usage-profiles-table
+      author: system
+      changes:
+        - createTable:
+            tableName: usage_profiles
+            columns:
+              - column:
+                  name: profile_id
+                  type: varchar(36)
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: project_id
+                  type: text
+                  constraints:
+                    nullable: false
+              - column:
+                  name: environment
+                  type: text
+                  constraints:
+                    nullable: false
+              - column:
+                  name: users_count
+                  type: bigint
+              - column:
+                  name: requests_per_day
+                  type: bigint
+              - column:
+                  name: peak_rps
+                  type: double precision
+              - column:
+                  name: data_ingest_gb_per_day
+                  type: double precision
+              - column:
+                  name: data_retention_days
+                  type: bigint
+              - column:
+                  name: storage_growth_gb_per_month
+                  type: double precision
+              - column:
+                  name: availability_target
+                  type: text
+              - column:
+                  name: dr_required
+                  type: boolean
+              - column:
+                  name: source_chunk_id
+                  type: varchar(36)
+              - column:
+                  name: created_at
+                  type: timestamptz
+              - column:
+                  name: updated_at
+                  type: timestamptz
+        - addForeignKeyConstraint:
+            baseTableName: usage_profiles
+            baseColumnNames: project_id
+            constraintName: fk_usage_profile_project
+            referencedTableName: projects
+            referencedColumnNames: project_id
+        - addForeignKeyConstraint:
+            baseTableName: usage_profiles
+            baseColumnNames: source_chunk_id
+            constraintName: fk_usage_profile_chunk
+            referencedTableName: semantic_chunks
+            referencedColumnNames: chunk_id
+
+  - changeSet:
+      id: 003-create-resource-cost-estimates-table
+      author: system
+      changes:
+        - createTable:
+            tableName: resource_cost_estimates
+            columns:
+              - column:
+                  name: estimate_id
+                  type: varchar(36)
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: project_id
+                  type: text
+                  constraints:
+                    nullable: false
+              - column:
+                  name: resource_id
+                  type: varchar(36)
+              - column:
+                  name: resource_name
+                  type: text
+              - column:
+                  name: environment
+                  type: text
+                  constraints:
+                    nullable: false
+              - column:
+                  name: provider
+                  type: text
+                  constraints:
+                    nullable: false
+              - column:
+                  name: billing_model
+                  type: text
+                  constraints:
+                    nullable: false
+              - column:
+                  name: quantity
+                  type: double precision
+              - column:
+                  name: unit
+                  type: text
+              - column:
+                  name: unit_cost
+                  type: double precision
+              - column:
+                  name: estimated_monthly_cost
+                  type: double precision
+              - column:
+                  name: currency
+                  type: text
+                  constraints:
+                    nullable: false
+              - column:
+                  name: pricing_source
+                  type: text
+              - column:
+                  name: pricing_date
+                  type: date
+              - column:
+                  name: assumptions
+                  type: text
+              - column:
+                  name: source_artifact_id
+                  type: varchar(36)
+              - column:
+                  name: source_chunk_id
+                  type: varchar(36)
+              - column:
+                  name: confidence
+                  type: double precision
+              - column:
+                  name: created_at
+                  type: timestamptz
+              - column:
+                  name: updated_at
+                  type: timestamptz
+        - addForeignKeyConstraint:
+            baseTableName: resource_cost_estimates
+            baseColumnNames: project_id
+            constraintName: fk_cost_estimate_project
+            referencedTableName: projects
+            referencedColumnNames: project_id
+        - addForeignKeyConstraint:
+            baseTableName: resource_cost_estimates
+            baseColumnNames: resource_id
+            constraintName: fk_cost_estimate_resource
+            referencedTableName: deployment_resources
+            referencedColumnNames: resource_id
+        - addForeignKeyConstraint:
+            baseTableName: resource_cost_estimates
+            baseColumnNames: source_artifact_id
+            constraintName: fk_cost_estimate_artifact
+            referencedTableName: artifacts
+            referencedColumnNames: artifact_id
+        - addForeignKeyConstraint:
+            baseTableName: resource_cost_estimates
+            baseColumnNames: source_chunk_id
+            constraintName: fk_cost_estimate_chunk
+            referencedTableName: semantic_chunks
+            referencedColumnNames: chunk_id
