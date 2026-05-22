@@ -1,4 +1,4 @@
-package com.kengine.ingestion.util;
+package com.kengine.ingestion.helper;
 
 public final class JsonResponseExtractor {
 

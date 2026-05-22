@@ -3,9 +3,9 @@ package com.kengine.ingestion.service;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.kengine.ingestion.dto.DocumentKnowledge;
 import com.kengine.ingestion.dto.KnowledgeExtractionResult;
-import com.kengine.ingestion.util.CommonUtil;
-import com.kengine.ingestion.util.JsonResponseExtractor;
-import com.kengine.ingestion.util.PromptLoader;
+import com.kengine.ingestion.helper.JsonResponseExtractor;
+import com.kengine.ingestion.helper.PromptLoader;
+import com.kengine.ingestion.helper.StringUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -20,7 +20,7 @@ import org.springframework.stereotype.Service;
 @Slf4j
 public class EnhancedKnowledgeExtractionService {
 
-  private final VertexAIClient vertexAIClient;
+  private final VertexAIService vertexAIService;
   private final PromptLoader promptLoader;
   private final XMLPlatformDetector platformDetector;
   private final ObjectMapper mapper;
@@ -57,7 +57,7 @@ public class EnhancedKnowledgeExtractionService {
 
       // Call Vertex AI
       log.debug("Calling Vertex AI for enhanced chunk extraction");
-      String response = vertexAIClient.generate(prompt);
+      String response = vertexAIService.generate(prompt);
 
       // Parse JSON response
       KnowledgeExtractionResult result =
@@ -87,31 +87,32 @@ public class EnhancedKnowledgeExtractionService {
     prompt =
         prompt.replace(
             "{{OVERALL_ARCHITECTURE}}",
-            CommonUtil.safeString(docContext.getOverallArchitecture(), "Not specified"));
-    prompt = prompt.replace("{{DOMAIN}}", CommonUtil.safeString(docContext.getDomain(), "Unknown"));
+            StringUtils.safeString(docContext.getOverallArchitecture(), "Not specified"));
+    prompt =
+        prompt.replace("{{DOMAIN}}", StringUtils.safeString(docContext.getDomain(), "Unknown"));
     prompt =
         prompt.replace(
-            "{{SUBDOMAIN}}", CommonUtil.safeString(docContext.getSubdomain(), "Unknown"));
+            "{{SUBDOMAIN}}", StringUtils.safeString(docContext.getSubdomain(), "Unknown"));
     prompt =
         prompt.replace(
             "{{KEY_PATTERNS}}",
-            CommonUtil.safeListToString(docContext.getKeyPatterns(), "None identified"));
+            StringUtils.safeListToString(docContext.getKeyPatterns(), "None identified"));
     prompt =
         prompt.replace(
             "{{TECHNOLOGIES}}",
-            CommonUtil.safeListToString(docContext.getTechnologies(), "None identified"));
+            StringUtils.safeListToString(docContext.getTechnologies(), "None identified"));
     prompt =
         prompt.replace(
             "{{IDENTIFIED_COMPONENTS}}",
-            CommonUtil.safeListToString(docContext.getIdentifiedComponents(), "None identified"));
+            StringUtils.safeListToString(docContext.getIdentifiedComponents(), "None identified"));
     prompt =
         prompt.replace(
             "{{IDENTIFIED_APIS}}",
-            CommonUtil.safeListToString(docContext.getIdentifiedAPIs(), "None identified"));
+            StringUtils.safeListToString(docContext.getIdentifiedAPIs(), "None identified"));
     prompt =
         prompt.replace(
             "{{IDENTIFIED_WORKFLOWS}}",
-            CommonUtil.safeListToString(docContext.getIdentifiedWorkflows(), "None identified"));
+            StringUtils.safeListToString(docContext.getIdentifiedWorkflows(), "None identified"));
 
     // Replace chunk content
     prompt = prompt.replace("{{CHUNK_CONTENT}}", chunkContent);
@@ -127,7 +128,7 @@ public class EnhancedKnowledgeExtractionService {
     try {
       String template = promptLoader.load("prompt/knowledge-extraction-prompt.txt");
       String prompt = template.replace("{{CONTENT}}", content);
-      String response = vertexAIClient.generate(prompt);
+      String response = vertexAIService.generate(prompt);
       return mapper.readValue(
           JsonResponseExtractor.object(response), KnowledgeExtractionResult.class);
     } catch (Exception e) {

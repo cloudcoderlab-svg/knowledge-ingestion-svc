@@ -10,10 +10,12 @@ import com.google.cloud.storage.Blob;
 import com.google.cloud.storage.BlobId;
 import com.google.cloud.storage.Storage;
 import com.kengine.ingestion.dto.ClassificationResult;
+import com.kengine.ingestion.dto.DocumentContent;
+import com.kengine.ingestion.dto.DocumentKnowledge;
+import com.kengine.ingestion.dto.KnowledgeExtractionResult;
 import com.kengine.ingestion.dto.SemanticChunk;
 import com.kengine.ingestion.dto.SourceDocumentMetadata;
-import com.kengine.ingestion.parser.DocumentParser;
-import java.io.InputStream;
+import com.kengine.ingestion.parser.DocumentParserOrchestrator;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -25,9 +27,11 @@ import org.mockito.junit.jupiter.MockitoExtension;
 @ExtendWith(MockitoExtension.class)
 class KnowledgeIngestionServiceTest {
 
-  @Mock private DocumentParser genericParser;
+  @Mock private DocumentParserOrchestrator documentParserOrchestrator;
+  @Mock private DocumentLevelAnalysisService documentLevelAnalysisService;
+  @Mock private EnhancedKnowledgeExtractionService enhancedKnowledgeExtractionService;
+  @Mock private KnowledgeGraphService knowledgeGraphService;
   @Mock private SemanticClassificationService classificationService;
-  @Mock private KnowledgeExtractionService knowledgeExtractionService;
   @Mock private EmbeddingService embeddingService;
   @Mock private PostgresStorageService storageService;
   @Mock private DocumentChunker documentChunker;
@@ -61,13 +65,21 @@ class KnowledgeIngestionServiceTest {
             .content(content)
             .contentHash("chunk-hash")
             .build();
-    when(genericParser.parse(any(InputStream.class))).thenReturn(content);
+    DocumentContent documentContent = DocumentContent.builder().textContent(content).build();
+    DocumentKnowledge documentKnowledge = DocumentKnowledge.builder().domain("MDM").build();
+    KnowledgeExtractionResult extractionResult = new KnowledgeExtractionResult();
+    when(documentParserOrchestrator.parseDocument(any(), eq("txt"))).thenReturn(documentContent);
     when(documentChunker.contentHash(content)).thenReturn("document-hash");
     when(storageService.findExistingClassification(any(SourceDocumentMetadata.class)))
         .thenReturn(null);
+    when(documentLevelAnalysisService.analyze(
+            any(DocumentContent.class), any(SourceDocumentMetadata.class)))
+        .thenReturn(documentKnowledge);
     when(documentChunker.chunk(content)).thenReturn(List.of(chunk));
     when(classificationService.classify(content)).thenReturn(result);
     when(embeddingService.embedding(content)).thenReturn(List.of(0.1, 0.2));
+    when(enhancedKnowledgeExtractionService.extract(content, documentKnowledge))
+        .thenReturn(extractionResult);
 
     // Act
     ClassificationResult actual = ingestionService.ingestFromGcs(bucket, object);
@@ -75,7 +87,8 @@ class KnowledgeIngestionServiceTest {
     // Assert
     assertEquals("MDM", actual.getDomain());
     verify(storageService).saveDocument(any(SourceDocumentMetadata.class), any());
-    verify(knowledgeExtractionService).extract(content);
+    verify(knowledgeGraphService)
+        .buildKnowledgeGraph(any(SourceDocumentMetadata.class), eq(documentKnowledge), any());
   }
 
   @Test
@@ -108,7 +121,8 @@ class KnowledgeIngestionServiceTest {
     ReadChannel readChannel = mock(ReadChannel.class);
     when(storage.get(any(BlobId.class))).thenReturn(blob);
     when(blob.reader()).thenReturn(readChannel);
-    when(genericParser.parse(any(InputStream.class))).thenReturn(content);
+    when(documentParserOrchestrator.parseDocument(any(), eq("txt")))
+        .thenReturn(DocumentContent.builder().textContent(content).build());
     when(documentChunker.contentHash(content)).thenReturn("document-hash");
     when(storageService.findExistingClassification(any(SourceDocumentMetadata.class)))
         .thenReturn(existing);
@@ -116,7 +130,12 @@ class KnowledgeIngestionServiceTest {
     ClassificationResult actual = ingestionService.ingestFromGcs(bucket, object);
 
     assertEquals("MDM", actual.getDomain());
-    verifyNoInteractions(classificationService, embeddingService, knowledgeExtractionService);
+    verifyNoInteractions(
+        documentLevelAnalysisService,
+        classificationService,
+        embeddingService,
+        enhancedKnowledgeExtractionService,
+        knowledgeGraphService);
     verify(storageService, never()).saveDocument(any(), any());
   }
 
@@ -154,13 +173,22 @@ class KnowledgeIngestionServiceTest {
             .content(content)
             .contentHash("chunk-hash")
             .build();
-    when(genericParser.parse(any(InputStream.class))).thenReturn(content);
+    DocumentContent documentContent = DocumentContent.builder().textContent(content).build();
+    DocumentKnowledge documentKnowledge = DocumentKnowledge.builder().domain("MDM").build();
+    KnowledgeExtractionResult extractionResult = new KnowledgeExtractionResult();
+    String fileType = objectName.substring(objectName.lastIndexOf('.') + 1).toLowerCase();
+    when(documentParserOrchestrator.parseDocument(any(), eq(fileType))).thenReturn(documentContent);
     when(documentChunker.contentHash(content)).thenReturn("document-hash");
     when(storageService.findExistingClassification(any(SourceDocumentMetadata.class)))
         .thenReturn(null);
+    when(documentLevelAnalysisService.analyze(
+            any(DocumentContent.class), any(SourceDocumentMetadata.class)))
+        .thenReturn(documentKnowledge);
     when(documentChunker.chunk(content)).thenReturn(List.of(chunk));
     when(classificationService.classify(content)).thenReturn(result);
     when(embeddingService.embedding(content)).thenReturn(List.of(0.1, 0.2));
+    when(enhancedKnowledgeExtractionService.extract(content, documentKnowledge))
+        .thenReturn(extractionResult);
 
     ingestionService.ingestFromGcs("test-bucket", objectName);
 

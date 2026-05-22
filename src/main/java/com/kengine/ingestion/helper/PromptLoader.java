@@ -1,4 +1,4 @@
-package com.kengine.ingestion.util;
+package com.kengine.ingestion.helper;
 
 import java.nio.charset.StandardCharsets;
 import org.springframework.core.io.ClassPathResource;

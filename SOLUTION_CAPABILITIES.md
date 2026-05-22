@@ -1,127 +1,354 @@
-# Knowledge Extractor Solution Capabilities
+# Knowledge Ingestion Service Capabilities
 
-This service is the generic knowledge-base extractor for software delivery and migration programs.
+This service is the generic knowledge-ingestion and knowledge-graph builder for software delivery, modernization, and migration programs.
 
-It is intentionally not tied only to TIBCO MDM. It can ingest source material from normal development projects and from legacy/BPM migration projects, extract generic knowledge, persist it in Cloud SQL for PostgreSQL with pgvector, and expose that knowledge to downstream MCP tools, AGENTS, and specialized extractor services.
+It ingests source artifacts from GCS, extracts document and chunk-level knowledge with Vertex AI, persists source evidence and structured facts in Cloud SQL for PostgreSQL, and stores embeddings in pgvector-backed columns for semantic retrieval and downstream RAG workflows.
 
-## Core Positioning
+## Current Architecture
 
 ```text
-+-----------------------------+
-| knowledge-ingestion-svc     |
-| Generic knowledge extractor |
+-----------------------------+
+| GCS source artifacts        |
+| docs, XML, PDFs, images     |
 +-------------+---------------+
               |
               v
 +-------------+---------------+
-| Cloud SQL generic knowledge |
-| Chunks, embeddings, facts   |
+| Pub/Sub notification        |
+| kengine-knowledge-topic-sub |
 +-------------+---------------+
               |
-              +-------------------------------+
-              |                               |
-              v                               v
-+-------------+---------------+   +-----------+-------------------+
-| MCP / AGENT layer           |   | Specialized extractors        |
-| Normal development          |   | TIBCO, BPMN, Pega, etc.       |
-+-------------+---------------+   +-----------+-------------------+
-              |                               |
-              v                               v
-+-------------+---------------+   +-----------+-------------------+
-| LLD, tests, code, stories   |   | Precise migration facts       |
-| for normal development      |   | store / API                   |
-+-----------------------------+   +-----------+-------------------+
-                                              |
-                                              v
-                                  +-----------+-------------------+
-                                  | MCP / AGENT migration flows   |
-                                  +-------------------------------+
+              v
++-------------+---------------+
+| knowledge-ingestion-svc     |
+| Spring Boot + Jetty         |
++-------------+---------------+
+              |
+              v
++-------------+---------------+
+| Vertex AI                   |
+| classification, extraction, |
+| embeddings, multimodal      |
++-------------+---------------+
+              |
+              v
++-------------+---------------+
+| Cloud SQL PostgreSQL        |
+| schema: knowledge           |
+| pgvector vector(768)        |
++-------------+---------------+
+              |
+              v
++-------------+---------------+
+| MCP / AGENT / extractor     |
+| consumers                   |
++-----------------------------+
 ```
 
-## What This Service Does
-
-The current service supports the first-stage knowledge extraction pipeline:
+## Runtime Stack
 
 ```text
-Source artifacts
-  |
-  |-- XML
-  |-- requirements
-  |-- design documents
-  |-- architecture notes
-  |-- diagrams with extractable text
-  |-- estimates / sizing documents
-  v
-GCS bucket
-  v
-knowledge-ingestion-svc
-  |
-  |-- parse source content
-  |-- chunk source content
-  |-- classify chunks
-  |-- create embeddings
-  |-- extract generic solution knowledge using LLM
-  v
+Java 21
+Spring Boot 3.4.2
+Spring MVC + Jetty
+Spring Data JPA
+Liquibase
 Cloud SQL for PostgreSQL
+pgvector
+Google Cloud Storage
+Google Pub/Sub
+Vertex AI
+Apache Tika
 ```
 
-## Generic Knowledge Extracted
+The service currently listens on port `8086`.
 
-The service extracts and stores:
+## Cloud SQL Configuration
+
+The active persistence target is:
 
 ```text
-+----------------------------+------------------------------------------+
-| Knowledge type             | Purpose                                  |
-+----------------------------+------------------------------------------+
-| Source chunks              | Evidence and RAG context                 |
-| Embeddings                 | Semantic retrieval                       |
-| Business rules             | Functional logic and validations         |
-| Business flows             | End-to-end business processes            |
-| Business flow steps        | Ordered activities within a flow         |
-| Business components        | Capabilities and domain-owned modules    |
-| Technical components       | APIs, services, jobs, adapters, modules  |
-| Deployment resources       | Cloud and on-prem runtime dependencies   |
-| Relationships              | Component, flow, resource dependencies   |
-| Knowledge notes            | Architecture and migration observations  |
-| Usage profiles             | Volume, traffic, retention, DR details   |
-| Cost estimates             | Resource cost and sizing assumptions     |
-+----------------------------+------------------------------------------+
+Cloud SQL instance: appdata-inst-001
+Database:           kengine-db
+Application schema: knowledge
+Liquibase schema:   public
+Application user:   kengine-app
 ```
 
-## Current Storage Model
+Configuration is environment-driven:
 
 ```text
-knowledge.projects
-  |
-  +-- knowledge.artifacts
-        |
-        +-- knowledge.ingestion_documents
-        |
-        +-- knowledge.semantic_chunks
-        |     |
-        |     +-- chunk text
-        |     +-- embeddings
-        |     +-- source metadata
-        |
-        +-- knowledge.business_rules
-        +-- knowledge.business_flows
-        |     |
-        |     +-- knowledge.business_flow_steps
-        |
-        +-- knowledge.solution_components
-        +-- knowledge.deployment_resources
-        |     |
-        |     +-- knowledge.deployment_resource_configs
-        |
-        +-- knowledge.knowledge_relationships
-        +-- knowledge.knowledge_notes
-        +-- knowledge.usage_profiles
-        +-- knowledge.resource_cost_estimates
+KENGINE_DB_HOST
+KENGINE_DB_PORT
+KENGINE_DB_NAME
+KENGINE_DB_USER
+KENGINE_DB_PASSWORD
 ```
 
-## Current Query Surface
+Liquibase uses `classpath:/db/changelog/db.changelog-master.xml`.
 
-The service exposes retrieval endpoints for downstream services and MCP wrappers:
+## Schema Management
+
+Liquibase manages the database schema through a regenerated baseline changelog:
+
+```text
+db.changelog-master.xml
+sql/baseline-001-knowledge-schema.sql
+```
+
+The Liquibase-created schema includes:
+
+```text
+Core ingestion tables:
+- knowledge.projects
+- knowledge.domains
+- knowledge.subdomains
+- knowledge.artifacts
+- knowledge.ingestion_documents
+- knowledge.semantic_chunks
+
+Generic extraction tables:
+- knowledge.solution_components
+- knowledge.business_rules
+- knowledge.business_flows
+- knowledge.business_flow_steps
+- knowledge.deployment_resources
+- knowledge.deployment_resource_configs
+- knowledge.knowledge_relationships
+- knowledge.knowledge_notes
+- knowledge.usage_profiles
+- knowledge.resource_cost_estimates
+- knowledge.knowledge_data_models
+- knowledge.knowledge_data_fields
+
+Business layer tables:
+- knowledge.business_roles
+- knowledge.business_users
+- knowledge.business_capabilities
+- knowledge.business_role_workflows
+- knowledge.business_decisions
+- knowledge.business_terms
+- knowledge.business_policies
+- knowledge.business_metrics
+```
+
+Embedding columns use `vector(768)`, matching the configured Vertex AI embedding model `text-embedding-005`. The index changelog creates HNSW indexes with `vector_cosine_ops` for semantic-search-ready tables.
+
+The Java entity/repository layer also targets these knowledge graph tables:
+
+```text
+- knowledge.document_knowledge
+- knowledge.knowledge_components
+- knowledge.knowledge_apis
+- knowledge.knowledge_business_rules
+- knowledge.knowledge_workflows
+- knowledge.knowledge_workflow_steps
+- knowledge.knowledge_integrations
+- knowledge.knowledge_resources
+```
+
+These graph tables are included in the regenerated baseline SQL changelog.
+
+## Ingestion Trigger
+
+The service subscribes to Google Pub/Sub using:
+
+```text
+gcp.project-id=app-lab-001
+gcp.pubsub.subscription-id=kengine-knowledge-topic-sub
+```
+
+Incoming Pub/Sub messages are expected to contain GCS event JSON with:
+
+```json
+{
+  "bucket": "...",
+  "name": "project-id/path/to/source"
+}
+```
+
+The first path segment of the GCS object name becomes the project id. Root-level objects are rejected.
+
+## Parsing Capabilities
+
+The active parser is `DocumentParserOrchestrator`.
+
+It routes configured multimodal file types through Gemini multimodal extraction:
+
+```text
+pdf, png, jpg, jpeg, docx, pptx
+```
+
+Other files use Apache Tika text extraction.
+
+The normalized parser output is `DocumentContent`, which can include:
+
+```text
+- text content
+- diagram descriptions
+- table content
+- metadata
+```
+
+## Extraction Pipeline
+
+The current ingestion flow is:
+
+```text
+GCS object
+  v
+parse document
+  v
+document-level analysis
+  v
+semantic chunking
+  v
+per-chunk classification
+  v
+per-chunk embedding
+  v
+context-aware chunk extraction
+  v
+persist source artifact and chunks
+  v
+build knowledge graph
+  v
+persist graph entities with embeddings
+```
+
+Document-level analysis runs before chunking so later chunk extraction has broader context. It extracts high-level domain, subdomain, architecture summary, key patterns, technologies, components, APIs, and workflows.
+
+Chunk-level extraction then uses that document context to improve entity linking and confidence.
+
+## Vertex AI Usage
+
+The configured Vertex AI settings are:
+
+```text
+vertex.project-id=ai-lab-001-494218
+vertex.location=us-central1
+vertex.classification-model-name=gemini-2.5-flash
+vertex.embedding-model-name=text-embedding-005
+```
+
+Vertex AI is used for:
+
+```text
+- document-level analysis
+- chunk classification
+- enhanced knowledge extraction
+- multimodal document extraction
+- source chunk embeddings
+- entity embeddings for graph nodes
+```
+
+## XML Platform Detection
+
+XML documents are analyzed by `XMLPlatformDetector`.
+
+Detected platforms include:
+
+```text
+TIBCO MDM
+TIBCO BPM
+TIBCO BusinessWorks
+Informatica MDM
+SAP MDM
+Oracle MDM
+IBM InfoSphere MDM
+Reltio MDM
+Semarchy MDM
+Pega BPM
+Camunda BPMN
+Activiti BPMN
+jBPM
+Flowable BPMN
+BPMN 2.0 generic
+Oracle BPEL
+IBM BPM
+Appian
+SAP Workflow
+Generic XML
+```
+
+Currently present platform-specific chunk prompts:
+
+```text
+- tibco-mdm-extraction-prompt.txt
+- camunda-bpmn-extraction-prompt.txt
+- pega-bpm-extraction-prompt.txt
+```
+
+Other detected platforms fall back to the generic enhanced extraction prompt until their specialized prompts are added.
+
+## Knowledge Extracted
+
+The service extracts and persists:
+
+```text
+- source artifacts and ingestion documents
+- semantic chunks with source evidence and embeddings
+- document-level architecture knowledge
+- business and technical components
+- APIs
+- business rules
+- workflows and workflow steps
+- deployment resources and configuration
+- data models and data fields
+- integrations
+- relationships
+- usage profiles
+- cost estimates
+- business roles, users, capabilities, decisions, terms, policies, and metrics
+```
+
+## Knowledge Graph Persistence
+
+`KnowledgeGraphService` is wired to build graph entities after source chunks have been saved.
+
+It currently:
+
+```text
+- ensures domain and subdomain records exist
+- saves document-level knowledge
+- extracts business and technical components
+- extracts business rules
+- extracts workflows and workflow steps
+- extracts deployment resources
+- extracts relationships
+- generates embeddings for graph entities
+- persists graph entities through Spring Data repositories
+```
+
+Knowledge graph persistence is controlled by:
+
+```text
+ingestion.knowledge-graph.enable-persistence=true
+ingestion.knowledge-graph.batch-size=100
+```
+
+Entity embedding generation is controlled by:
+
+```text
+ingestion.extraction.enable-entity-embeddings=true
+```
+
+## Duplicate Handling
+
+Before processing, the service checks for an existing ingestion document by:
+
+```text
+project_id
+source_bucket
+source_object
+content_hash
+```
+
+If the same source content was already ingested, classification, embedding, extraction, and persistence are skipped.
+
+## Public Query Surface
+
+The public controller exposes these endpoints:
 
 ```text
 GET /api/v1/projects/{projectId}/knowledge/sources
@@ -135,373 +362,95 @@ GET /api/v1/projects/{projectId}/knowledge
     ?sourceObject={sourceObject}
 ```
 
-These endpoints allow downstream services to retrieve:
+Endpoint behavior:
 
 ```text
-+---------------------+-----------------------------------------------+
-| Endpoint             | Use                                           |
-+---------------------+-----------------------------------------------+
-| /sources             | Discover ingested source artifacts            |
-| /chunks              | Retrieve source evidence and RAG text         |
-| /knowledge           | Retrieve extracted generic facts              |
-+---------------------+-----------------------------------------------+
+/sources
+  Lists ingested artifacts for a project.
+
+/chunks
+  Returns source chunks for evidence/RAG context.
+  Supports optional sourceObject filtering, text search, and limit.
+  Default limit: 100
+  Max limit: 1000
+
+/knowledge
+  Returns a GenericKnowledgeSnapshot containing extracted facts.
+  Supports optional sourceObject filtering.
 ```
 
-## Normal Development Flow
+The public API is still retrieval-oriented. It does not yet expose dedicated semantic-search endpoints or full CRUD over graph entities, although the database schema and indexes are prepared for vector search.
 
-For normal development, this service can support AGENT workflows for epics, stories, LLD, test cases, and code generation.
+## Downstream Uses
+
+The service can feed:
 
 ```text
-Requirements / diagrams / design docs
-  v
-knowledge-ingestion-svc
-  v
-Cloud SQL knowledge base
-  v
-MCP tools
-  v
-AGENT
-  |
-  |-- generate epics
-  |-- generate user stories
-  |-- generate LLD
-  |-- generate test cases
-  |-- generate Java / Spring Boot code
+- MCP tools
+- agent workflows
+- LLD generation
+- test-case generation
+- code-generation context builders
+- migration discovery workflows
+- specialized platform extractors
+- RAG retrieval pipelines
 ```
 
-Recommended MCP tools for normal development:
+Recommended MCP-facing tool shapes remain:
 
 ```text
-+-----------------------------+-----------------------------------------+
-| MCP tool                    | Purpose                                 |
-+-----------------------------+-----------------------------------------+
-| list_sources                | List available documents and diagrams   |
-| get_source_chunks           | Retrieve evidence text                  |
-| get_generic_knowledge       | Retrieve extracted facts                |
-| get_generation_context      | Build complete generation context       |
-| get_lld_context             | Build LLD-specific context              |
-| get_testcase_context        | Build test-case-specific context        |
-| get_code_generation_context | Build code-generation context           |
-+-----------------------------+-----------------------------------------+
+- list_sources
+- get_source_chunks
+- get_generic_knowledge
+- get_generation_context
+- get_lld_context
+- get_testcase_context
+- get_code_generation_context
 ```
 
-## Migration Flow
+## Migration And Modernization Role
 
-For migration, this service acts as the generic first-stage extractor. It should not contain every platform-specific parser. Specialized extractors should be implemented as separate services.
+The service now performs more than generic text extraction: it builds a pgvector-backed knowledge graph from documents and chunks.
+
+For migration programs, it can identify platform type, extract generic and platform-assisted facts, persist evidence, and provide context for downstream migration agents.
+
+It is still not intended to be the final precise parser for every platform export. Exact platform semantics should still be handled by specialized services when precision matters.
+
+Examples:
 
 ```text
-Legacy / BPM / MDM artifacts
-  |
-  |-- TIBCO MDM XML
-  |-- BPMN
-  |-- Pega exports
-  |-- IBM BPM exports
-  |-- Camunda BPMN
-  |-- Appian packages
-  |-- design docs
-  |-- diagrams
-  v
-knowledge-ingestion-svc
-  |
-  |-- chunks
-  |-- embeddings
-  |-- generic business rules
-  |-- generic business flows
-  |-- generic components
-  |-- generic relationships
-  v
-Cloud SQL knowledge base
-  v
-Specialized extractor service
-  |
-  |-- precise platform-specific parsing
-  |-- exact workflow model
-  |-- exact rule model
-  |-- exact data mappings
-  |-- exact dependency model
-  v
-Precise migration facts store / API
-  |
-  |-- platform-specific entities
-  |-- process definitions
-  |-- rule definitions
-  |-- workflow states and transitions
-  |-- service bindings
-  |-- data mappings
-  |-- migration gaps and assumptions
-  v
-MCP / AGENT
-  |
-  |-- migration epics
-  |-- migration stories
-  |-- target architecture
-  |-- LLD
-  |-- test cases
-  |-- Java microservice code
+TIBCO MDM extractor:
+  parse repository XML, entities, attributes, rulebases, workflows
+
+BPMN extractor:
+  parse process definitions, gateways, events, sequence flows
+
+Pega extractor:
+  parse case types, stages, flows, rules, decision tables
+
+Integration extractor:
+  parse service bindings, mappings, protocols, endpoints
 ```
 
-## Specialized Extractor Services
+Those specialized extractors can consume this service's chunks, graph entities, embeddings, and extracted facts.
 
-Specialized extractors should be separate services that consume the generic knowledge base.
+## Current Boundaries
+
+The current implementation does not yet provide:
 
 ```text
-+--------------------------+
-| Cloud SQL generic KB     |
-| chunks and generic facts |
-+------------+-------------+
-             |
-             v
-+------------+-------------+
-| Specialized extractors   |
-+------------+-------------+
-             |
-             +-----------------------------+
-             |                             |
-             v                             v
-+------------+-------------+   +-----------+--------------+
-| TIBCO MDM extractor      |   | BPMN extractor           |
-+------------+-------------+   +-----------+--------------+
-             |                             |
-             v                             v
-+------------+-------------+   +-----------+--------------+
-| Precise TIBCO facts      |   | Precise BPMN facts       |
-+------------+-------------+   +-----------+--------------+
-             |                             |
-             +--------------+--------------+
-                            |
-                            v
-              +-------------+---------------+
-              | Precise migration facts     |
-              | store / API                 |
-              +-------------+---------------+
-                            |
-                            v
-              +-------------+---------------+
-              | MCP migration tools         |
-              | Migration AGENTS            |
-              +-----------------------------+
-
-Other extractor services can plug into the same pattern:
-
-+-------------------+     +-------------------+     +-------------------+
-| Pega extractor    |     | IBM BPM extractor |     | Camunda extractor |
-+-------------------+     +-------------------+     +-------------------+
-
-+-------------------+
-| Appian extractor  |
-+-------------------+
+- a public vector similarity search endpoint
+- a public graph traversal API
+- exact structural parsers for every detected XML platform
+- automatic deletion or replacement of stale rows from older ingestions
+- a UI
+- a full migration planning API
 ```
 
-## Why Specialized Extractors Are Separate
-
-This separation keeps the design clean:
-
-```text
-+-----------------------------+------------------------------------------+
-| Generic service             | Specialized extractor                    |
-+-----------------------------+------------------------------------------+
-| Ingests many document types  | Understands one platform deeply          |
-| Extracts broad knowledge     | Extracts precise platform facts          |
-| Reusable for normal dev      | Used for migration-specific precision    |
-| Stores source evidence       | Produces target migration model          |
-| Exposes query APIs           | Exposes platform-specific facts to MCP   |
-+-----------------------------+------------------------------------------+
-```
-
-The generic service should not become a large collection of unrelated BPM parsers. Each platform has different export formats, rule semantics, workflow structures, and migration concerns.
-
-## Example TIBCO MDM Migration Flow
-
-```text
-TIBCO MDM XML + docs + diagrams
-  v
-knowledge-ingestion-svc
-  v
-Cloud SQL generic KB
-  |
-  |-- sources tagged as tibco_mdm_xml
-  |-- chunks with evidence text
-  |-- generic business rules
-  |-- generic business flows
-  |-- generic components
-  |-- generic relationships
-  v
-TIBCO MDM extractor service
-  |
-  |-- parse TIBCO XML structure
-  |-- extract entities
-  |-- extract attributes
-  |-- extract rulebases
-  |-- extract validations
-  |-- extract workflows
-  |-- extract states and transitions
-  |-- extract integration points
-  v
-Precise TIBCO migration facts
-  |
-  |-- MDM entities and attributes
-  |-- MDM relationships
-  |-- rulebases and validations
-  |-- workflows
-  |-- states and transitions
-  |-- integration endpoints
-  |-- Java microservice mapping hints
-  v
-MCP / AGENT
-  |
-  |-- epics
-  |-- stories
-  |-- LLD
-  |-- Spring Boot services
-  |-- entities and DTOs
-  |-- validation logic
-  |-- workflow orchestration
-  |-- test cases
-```
-
-## Example BPMN Migration Flow
-
-```text
-BPMN files + process docs + diagrams
-  v
-knowledge-ingestion-svc
-  v
-Cloud SQL generic KB
-  v
-BPMN extractor service
-  |
-  |-- parse BPMN XML
-  |-- extract pools and lanes
-  |-- extract tasks
-  |-- extract events
-  |-- extract gateways
-  |-- extract sequence flows
-  |-- extract message flows
-  |-- extract subprocesses
-  |-- extract timers and error paths
-  v
-Precise BPMN migration facts
-  |
-  |-- process model
-  |-- lanes and actors
-  |-- tasks and service tasks
-  |-- events and gateways
-  |-- sequence and message flows
-  |-- subprocesses
-  |-- Java orchestration mapping hints
-  v
-MCP / AGENT
-  |
-  |-- microservice boundaries
-  |-- orchestration design
-  |-- event contracts
-  |-- LLD
-  |-- tests
-  |-- Java implementation plan
-```
-
-## Evidence and Traceability
-
-Every generated artifact should be traceable to source evidence:
-
-```text
-Generated artifact
-  |
-  +-- sourceObject
-  +-- artifactId
-  +-- chunkId
-  +-- chunkIndex
-  +-- contentHash
-  +-- excerpt
-```
-
-This is critical for:
-
-- reviewing AGENT output
-- validating migration logic
-- explaining generated code
-- debugging incorrect assumptions
-- supporting manual corrections later
-
-## What The Current Service Is Capable Of
-
-The current service is capable of:
-
-- generic document ingestion
-- generic XML text ingestion
-- chunking and embedding
-- generic business rule extraction
-- generic business flow extraction
-- generic component and resource extraction
-- generic relationship extraction
-- source evidence persistence
-- source/fact retrieval for MCP wrappers
-- supporting normal development AGENT workflows
-- supporting migration discovery and first-stage extraction
-- feeding specialized BPM or platform extractors
-
-## What The Current Service Does Not Try To Do
-
-The current service does not try to be a complete parser for every BPM or legacy platform.
-
-It does not yet provide precise structural extraction for:
-
-- TIBCO MDM rulebase XML
-- BPMN process semantics
-- Pega rules and case types
-- IBM BPM process applications
-- Camunda deployment packages
-- Appian application packages
-- platform-specific forms, screens, rules, and service bindings
-
-Those belong in specialized extractor services.
-
-## Recommended Final Architecture
-
-```text
-+-----------------------------------+
-| Source repositories / GCS         |
-| docs, XML, BPM exports, diagrams  |
-+----------------+------------------+
-                 |
-                 v
-+----------------+------------------+
-| knowledge-ingestion-svc           |
-| generic knowledge extractor       |
-+----------------+------------------+
-                 |
-                 v
-+----------------+------------------+
-| Cloud SQL generic knowledge base  |
-+----------------+------------------+
-                 |
-                 +-----------------------------------+
-                 |                                   |
-                 v                                   v
-+----------------+------------------+   +------------+------------------+
-| MCP normal-dev tools              |   | Specialized extractors        |
-+----------------+------------------+   +------------+------------------+
-                 |                                   |
-                 v                                   v
-+----------------+------------------+   +------------+------------------+
-| LLD / tests / code generation     |   | Precise migration facts       |
-+-----------------------------------+   | store / API                   |
-                                        +------------+------------------+
-                                                     |
-                                                     v
-                                        +------------+------------------+
-                                        | MCP migration tools          |
-                                        +------------+------------------+
-                                                     |
-                                                     v
-                                        +------------+------------------+
-                                        | epics, stories, migration    |
-                                        | LLD, tests, code generation  |
-                                        +-------------------------------+
-```
+These are natural extension points on top of the current schema and graph persistence layer.
 
 ## Design Principle
 
-The service should remain a reusable generic knowledge-base extractor.
+The service should remain the reusable knowledge-ingestion layer.
 
-Platform-specific precision should be added through separate specialized extractor services that consume this knowledge base and expose precise facts to MCP/AGENT workflows.
+Platform-specific precision, migration planning, and code generation should sit in downstream MCP tools, agents, or specialized extractor services that consume this knowledge base.

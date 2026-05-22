@@ -2,10 +2,10 @@ package com.kengine.ingestion.parser;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.kengine.ingestion.service.VertexAIService;
 import com.kengine.ingestion.dto.DiagramContent;
 import com.kengine.ingestion.dto.DocumentContent;
 import com.kengine.ingestion.dto.TableContent;
-import com.kengine.ingestion.service.VertexAIClient;
 import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
 import java.util.ArrayList;
@@ -24,7 +24,7 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 public class GeminiMultimodalExtractor implements DocumentContentExtractor {
 
-  private final VertexAIClient vertexAIClient;
+  private final VertexAIService vertexAIService;
   private final ObjectMapper objectMapper = new ObjectMapper();
 
   private static final String EXTRACTION_PROMPT =
@@ -81,7 +81,7 @@ public class GeminiMultimodalExtractor implements DocumentContentExtractor {
 
     // Call Gemini with image/document analysis
     String jsonResponse =
-        vertexAIClient.generateWithImage(EXTRACTION_PROMPT, documentData, mimeType);
+        vertexAIService.generateWithImage(EXTRACTION_PROMPT, documentData, mimeType);
 
     // Parse the JSON response
     return parseGeminiResponse(jsonResponse, documentData);

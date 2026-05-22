@@ -5,31 +5,15 @@
     xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
     http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.20.xsd">
 
-    <!-- ============================================================================ -->
-    <!-- Master Changelog - Knowledge Ingestion Database Schema                      -->
-    <!-- ============================================================================ -->
-    <!-- This is the master changelog file that orchestrates all database migrations. -->
-    <!-- Liquibase metadata tables are stored in the PUBLIC schema.                   -->
-    <!-- Application tables are created in the KNOWLEDGE schema.                      -->
-    <!--                                                                              -->
-    <!-- All knowledge entity tables include vector embeddings (vector(768))            -->
-    <!-- for RAG (Retrieval Augmented Generation) semantic search capabilities       -->
-    <!-- using Google Vertex AI text-embedding-005 model (768 dimensions).           -->
-    <!-- ============================================================================ -->
-
-    <!-- IMPORTANT: Enable pgvector extension FIRST before creating any tables -->
-    <include file="db/changelog/000-enable-pgvector.xml"/>
-
-    <!-- Core foundational tables: projects, domains, artifacts, semantic_chunks -->
-    <include file="db/changelog/001-create-core-tables.xml"/>
-
-    <!-- Technical knowledge entities: components, rules, flows, resources, data models -->
-    <include file="db/changelog/002-create-knowledge-tables.xml"/>
-
-    <!-- Business/functional layer: roles, capabilities, decisions, terms, policies, metrics -->
-    <include file="db/changelog/003-create-business-layer.xml"/>
-
-    <!-- Performance indexes for all tables (includes pgvector HNSW indexes) -->
-    <include file="db/changelog/004-create-indexes.xml"/>
+    <changeSet id="baseline-001-knowledge-schema" author="system">
+        <sqlFile
+            path="db/changelog/sql/baseline-001-knowledge-schema.sql"
+            relativeToChangelogFile="false"
+            splitStatements="true"
+            stripComments="false"/>
+        <rollback>
+            DROP SCHEMA IF EXISTS knowledge CASCADE;
+        </rollback>
+    </changeSet>
 
 </databaseChangeLog>

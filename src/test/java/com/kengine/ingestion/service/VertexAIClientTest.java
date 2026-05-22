@@ -14,6 +14,7 @@ import com.google.cloud.vertexai.generativeai.GenerativeModel;
 import com.google.protobuf.ListValue;
 import com.google.protobuf.Struct;
 import com.google.protobuf.Value;
+
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -27,17 +28,17 @@ class VertexAIClientTest {
   @Mock private PredictionServiceClient predictionServiceClient;
   @Mock private GenerativeModel classificationModel;
 
-  @InjectMocks private VertexAIClient vertexAIClient;
+  @InjectMocks private VertexAIService vertexAIService;
 
   @BeforeEach
   void setUp() {
     MockitoAnnotations.openMocks(this);
     ReflectionTestUtils.setField(
-        vertexAIClient, "predictionServiceClient", predictionServiceClient);
-    ReflectionTestUtils.setField(vertexAIClient, "classificationModel", classificationModel);
-    ReflectionTestUtils.setField(vertexAIClient, "projectId", "test-project");
-    ReflectionTestUtils.setField(vertexAIClient, "location", "us");
-    ReflectionTestUtils.setField(vertexAIClient, "embeddingModelName", "gemini-embedding-2");
+            vertexAIService, "predictionServiceClient", predictionServiceClient);
+    ReflectionTestUtils.setField(vertexAIService, "classificationModel", classificationModel);
+    ReflectionTestUtils.setField(vertexAIService, "projectId", "test-project");
+    ReflectionTestUtils.setField(vertexAIService, "location", "us");
+    ReflectionTestUtils.setField(vertexAIService, "embeddingModelName", "gemini-embedding-2");
   }
 
   @Test
@@ -56,7 +57,7 @@ class VertexAIClientTest {
 
     when(classificationModel.generateContent(prompt)).thenReturn(response);
 
-    String actual = vertexAIClient.generate(prompt);
+    String actual = vertexAIService.generate(prompt);
 
     assertEquals("classification", actual);
     verify(classificationModel).generateContent(prompt);
@@ -100,7 +101,7 @@ class VertexAIClientTest {
             Value.newBuilder().build()))
         .thenReturn(response);
 
-    List<Float> actualEmbeddings = vertexAIClient.embedding(text);
+    List<Float> actualEmbeddings = vertexAIService.embedding(text);
 
     assertEquals(expectedEmbeddings, actualEmbeddings);
     verify(predictionServiceClient)

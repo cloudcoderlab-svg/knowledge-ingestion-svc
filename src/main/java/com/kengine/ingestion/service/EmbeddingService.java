@@ -8,9 +8,9 @@ import org.springframework.stereotype.Service;
 @RequiredArgsConstructor
 public class EmbeddingService {
 
-  private final VertexAIClient vertexAIClient;
+  private final VertexAIService vertexAIService;
 
   public List<Double> embedding(String text) {
-    return vertexAIClient.embedding(text).stream().map(Float::doubleValue).toList();
+    return vertexAIService.embedding(text).stream().map(Float::doubleValue).toList();
   }
 }

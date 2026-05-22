@@ -4,8 +4,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.kengine.ingestion.dto.ClassificationResult;
-import com.kengine.ingestion.util.JsonResponseExtractor;
-import com.kengine.ingestion.util.PromptLoader;
+import com.kengine.ingestion.helper.JsonResponseExtractor;
+import com.kengine.ingestion.helper.PromptLoader;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -14,7 +14,7 @@ import org.springframework.stereotype.Service;
 @RequiredArgsConstructor
 public class SemanticClassificationService {
 
-  private final VertexAIClient vertexAIClient;
+  private final VertexAIService vertexAIService;
   private final PromptLoader promptLoader;
   private final ObjectMapper mapper;
 
@@ -24,7 +24,7 @@ public class SemanticClassificationService {
 
     String prompt = template.replace("{{CONTENT}}", content);
 
-    String response = vertexAIClient.generate(prompt);
+    String response = vertexAIService.generate(prompt);
 
     ObjectNode result = (ObjectNode) mapper.readTree(JsonResponseExtractor.object(response));
     normalizeTextField(result, "businessCapability");

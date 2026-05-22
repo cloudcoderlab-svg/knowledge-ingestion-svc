@@ -4,8 +4,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.kengine.ingestion.dto.DocumentContent;
 import com.kengine.ingestion.dto.DocumentKnowledge;
 import com.kengine.ingestion.dto.SourceDocumentMetadata;
-import com.kengine.ingestion.util.JsonResponseExtractor;
-import com.kengine.ingestion.util.PromptLoader;
+import com.kengine.ingestion.helper.JsonResponseExtractor;
+import com.kengine.ingestion.helper.PromptLoader;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -21,7 +21,7 @@ import org.springframework.stereotype.Service;
 @Slf4j
 public class DocumentLevelAnalysisService {
 
-  private final VertexAIClient vertexAIClient;
+  private final VertexAIService vertexAIService;
   private final PromptLoader promptLoader;
   private final XMLPlatformDetector platformDetector;
   private final ObjectMapper mapper;
@@ -74,7 +74,7 @@ public class DocumentLevelAnalysisService {
 
       // Call Vertex AI with the full document
       log.debug("Calling Vertex AI for document-level analysis");
-      String response = vertexAIClient.generate(prompt);
+      String response = vertexAIService.generate(prompt);
 
       // Parse JSON response into DocumentKnowledge
       DocumentKnowledge knowledge =

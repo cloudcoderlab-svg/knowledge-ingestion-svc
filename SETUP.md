@@ -55,7 +55,7 @@ spring:
     username: ${KENGINE_DB_USER:kengine-app}
     password: ${KENGINE_DB_PASSWORD:}
   liquibase:
-    change-log: classpath:/db/changelog/db.changelog-master.yaml
+    change-log: classpath:/db/changelog/db.changelog-master.xml
 
 cloudsql:
   instance-id: appdata-inst-001
@@ -64,7 +64,7 @@ cloudsql:
   user: kengine-app
 ```
 
-Liquibase manages the PostgreSQL schema in `src/main/resources/db/changelog`.
+Liquibase manages the PostgreSQL schema through `src/main/resources/db/changelog/db.changelog-master.xml`, which applies the regenerated baseline SQL at `src/main/resources/db/changelog/sql/baseline-001-knowledge-schema.sql`.
 
 The Cloud SQL schema includes:
 
