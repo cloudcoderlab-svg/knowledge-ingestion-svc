@@ -82,7 +82,7 @@ The Cloud SQL schema includes:
 
 Duplicate GCS notifications for the same bucket, object, and parsed content hash are skipped before classification, embedding, and extraction calls.
 
-Likely TIBCO/MDM XML files are tagged as `artifact_type = tibco_mdm_xml`. Generic XML files are tagged as `xml_doc`.
+XML files are tagged as `artifact_type = xml_doc`. Other document types are classified based on file extension and naming patterns.
 
 ## IAM Requirements
 

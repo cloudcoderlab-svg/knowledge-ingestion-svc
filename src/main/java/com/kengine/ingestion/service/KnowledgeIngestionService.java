@@ -4,12 +4,11 @@ import com.google.cloud.ReadChannel;
 import com.google.cloud.storage.Blob;
 import com.google.cloud.storage.BlobId;
 import com.google.cloud.storage.Storage;
-import com.kengine.ingestion.dto.ClassificationResult;
-import com.kengine.ingestion.dto.SemanticChunk;
-import com.kengine.ingestion.dto.SourceDocumentMetadata;
-import com.kengine.ingestion.parser.DocumentParser;
+import com.kengine.ingestion.dto.*;
+import com.kengine.ingestion.parser.DocumentParserOrchestrator;
 import java.io.InputStream;
 import java.nio.channels.Channels;
+import java.util.ArrayList;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -20,9 +19,18 @@ import org.springframework.stereotype.Service;
 @Slf4j
 public class KnowledgeIngestionService {
 
-  private final DocumentParser genericParser;
+  // Phase 2: Enhanced multimodal parser
+  private final DocumentParserOrchestrator documentParserOrchestrator;
+
+  // Phase 3: Document-level and enhanced chunk extraction
+  private final DocumentLevelAnalysisService documentLevelAnalysisService;
+  private final EnhancedKnowledgeExtractionService enhancedKnowledgeExtractionService;
+
+  // Phase 4: Knowledge graph persistence
+  private final KnowledgeGraphService knowledgeGraphService;
+
+  // Existing services
   private final SemanticClassificationService classificationService;
-  private final KnowledgeExtractionService knowledgeExtractionService;
   private final EmbeddingService embeddingService;
   private final PostgresStorageService storageService;
   private final DocumentChunker documentChunker;
@@ -37,21 +45,35 @@ public class KnowledgeIngestionService {
       throw new IllegalArgumentException("Blob not found: " + objectName);
     }
 
+    String fileType = fileType(objectName);
+
     try (ReadChannel reader = blob.reader();
         InputStream is = Channels.newInputStream(reader)) {
 
-      String content = genericParser.parse(is);
-      if (content == null || content.trim().isEmpty()) {
+      // Phase 2: Enhanced multimodal parsing (supports text + diagrams + tables)
+      log.info("Parsing document with multimodal support. File type: {}", fileType);
+      DocumentContent documentContent = documentParserOrchestrator.parseDocument(is, fileType);
+
+      if (documentContent.getTextContent() == null
+          || documentContent.getTextContent().trim().isEmpty()) {
         throw new IllegalArgumentException("Content is empty");
       }
+
       SourceDocumentMetadata source =
-          sourceMetadata(projectId, bucketName, objectName, blob, content);
-      return processContent(source, content);
+          sourceMetadata(projectId, bucketName, objectName, blob, documentContent.getTextContent());
+
+      return processContent(source, documentContent);
     }
   }
 
-  private ClassificationResult processContent(SourceDocumentMetadata source, String content)
-      throws Exception {
+  /**
+   * Processes document content using the new two-phase extraction pipeline: 1. Document-level
+   * analysis (preserves full context) 2. Enhanced chunk extraction (uses document context for
+   * better linking) 3. Knowledge graph building (persists to dedicated entity tables)
+   */
+  private ClassificationResult processContent(
+      SourceDocumentMetadata source, DocumentContent documentContent) throws Exception {
+
     ClassificationResult existing = storageService.findExistingClassification(source);
     if (existing != null) {
       log.info(
@@ -62,20 +84,63 @@ public class KnowledgeIngestionService {
       return existing;
     }
 
-    List<SemanticChunk> chunks = documentChunker.chunk(content);
+    // ========================================================================
+    // PHASE 3 PART 1: Document-Level Analysis (before chunking)
+    // ========================================================================
+    log.info("Starting document-level analysis for artifact: {}", source.objectName());
+    DocumentKnowledge docKnowledge = documentLevelAnalysisService.analyze(documentContent, source);
+    log.info(
+        "Document-level analysis complete. Domain: {}, Subdomain: {}",
+        docKnowledge.getDomain(),
+        docKnowledge.getSubdomain());
+
+    // ========================================================================
+    // Chunk the document
+    // ========================================================================
+    String fullTextContent = documentContent.getTextContent();
+    List<SemanticChunk> chunks = documentChunker.chunk(fullTextContent);
     if (chunks.isEmpty()) {
       throw new IllegalArgumentException("Content is empty after chunking");
     }
+    log.info("Document chunked into {} semantic chunks", chunks.size());
+
+    // ========================================================================
+    // PHASE 3 PART 2: Enhanced Chunk Extraction (with document context)
+    // ========================================================================
+    List<KnowledgeExtractionResult> allChunkKnowledge = new ArrayList<>();
 
     for (SemanticChunk chunk : chunks) {
       String chunkContent = chunk.getContent();
+
+      // Semantic classification (unchanged)
       chunk.setClassification(classificationService.classify(chunkContent));
+
+      // Generate chunk embedding (unchanged)
       chunk.setEmbedding(embeddingService.embedding(chunkContent));
-      chunk.setKnowledgeExtraction(knowledgeExtractionService.extract(chunkContent));
+
+      // NEW: Enhanced extraction with document context
+      KnowledgeExtractionResult chunkKnowledge =
+          enhancedKnowledgeExtractionService.extract(chunkContent, docKnowledge);
+      chunk.setKnowledgeExtraction(chunkKnowledge);
+
+      allChunkKnowledge.add(chunkKnowledge);
     }
 
+    log.info("Enhanced chunk extraction completed for {} chunks", chunks.size());
+
+    // ========================================================================
+    // Save chunks to semantic_chunks table (unchanged)
+    // ========================================================================
     storageService.saveDocument(source, chunks);
 
+    // ========================================================================
+    // PHASE 4: Build Knowledge Graph (NEW)
+    // ========================================================================
+    log.info("Building knowledge graph for artifact: {}", source.objectName());
+    knowledgeGraphService.buildKnowledgeGraph(source, docKnowledge, allChunkKnowledge);
+    log.info("Knowledge graph build completed");
+
+    // Return classification from first chunk for backward compatibility
     return chunks.get(0).getClassification();
   }
 
@@ -105,9 +170,6 @@ public class KnowledgeIngestionService {
 
   private String artifactType(String objectName) {
     String lowerName = objectName.toLowerCase();
-    if (lowerName.endsWith(".xml") && isLikelyTibcoMdmArtifact(lowerName)) {
-      return "tibco_mdm_xml";
-    }
     if (lowerName.endsWith(".xml")) {
       return "xml_doc";
     }
@@ -124,16 +186,6 @@ public class KnowledgeIngestionService {
       return "text_doc";
     }
     return "document";
-  }
-
-  private boolean isLikelyTibcoMdmArtifact(String lowerName) {
-    return lowerName.contains("tibco")
-        || lowerName.contains("mdm")
-        || lowerName.contains("rulebase")
-        || lowerName.contains("workflow")
-        || lowerName.contains("datamodel")
-        || lowerName.contains("data-model")
-        || lowerName.contains("repository");
   }
 
   private String fileType(String objectName) {

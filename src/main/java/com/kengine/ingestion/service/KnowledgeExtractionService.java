@@ -15,7 +15,7 @@ public class KnowledgeExtractionService {
 
   private final VertexAIClient vertexAIClient;
   private final PromptLoader promptLoader;
-  private final ObjectMapper mapper = new ObjectMapper();
+  private final ObjectMapper mapper;
 
   public KnowledgeExtractionResult extract(String content) {
     try {

@@ -79,10 +79,11 @@ class KnowledgeIngestionServiceTest {
   }
 
   @Test
-  void marksLikelyTibcoMdmXmlArtifacts() throws Exception {
-    SourceDocumentMetadata source = ingestAndCaptureSource("project-a/tibco/customer-workflow.xml");
+  void marksXmlArtifacts() throws Exception {
+    SourceDocumentMetadata source =
+        ingestAndCaptureSource("project-a/workflow/customer-workflow.xml");
 
-    assertEquals("tibco_mdm_xml", source.artifactType());
+    assertEquals("xml_doc", source.artifactType());
     assertEquals("xml", source.fileType());
   }
 

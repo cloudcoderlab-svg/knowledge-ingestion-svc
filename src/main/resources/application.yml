@@ -1,13 +1,31 @@
 server:
-  port: 8080
+  port: 8086
 
 spring:
   datasource:
     url: jdbc:postgresql://${KENGINE_DB_HOST:localhost}:${KENGINE_DB_PORT:5432}/${KENGINE_DB_NAME:kengine-db}
     username: ${KENGINE_DB_USER:kengine-app}
     password: ${KENGINE_DB_PASSWORD:}
+  jpa:
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
+    hibernate:
+      ddl-auto: none  # Liquibase manages schema
+    show-sql: false
+    open-in-view: false  # Disable to prevent lazy loading issues
+    properties:
+      hibernate:
+        format_sql: true
+        jdbc:
+          batch_size: 50
+          fetch_size: 50
+        order_inserts: true
+        order_updates: true
+        query:
+          in_clause_parameter_padding: true
   liquibase:
-    change-log: classpath:/db/changelog/db.changelog-master.yaml
+    change-log: classpath:/db/changelog/db.changelog-master.xml
+    liquibase-schema: public
+    default-schema: knowledge
 
 cloudsql:
   instance-id: appdata-inst-001
@@ -30,3 +48,13 @@ ingestion:
   chunk:
     max-chars: 3000
     overlap-chars: 300
+  parser:
+    multimodal-types: pdf,png,jpg,jpeg,docx,pptx
+    use-multimodal: true
+    max-document-size-mb: 50
+  extraction:
+    enable-document-level-analysis: true
+    enable-entity-embeddings: true
+  knowledge-graph:
+    enable-persistence: true
+    batch-size: 100

@@ -16,7 +16,7 @@ public class SemanticClassificationService {
 
   private final VertexAIClient vertexAIClient;
   private final PromptLoader promptLoader;
-  private final ObjectMapper mapper = new ObjectMapper();
+  private final ObjectMapper mapper;
 
   public ClassificationResult classify(String content) throws Exception {
 

@@ -1,0 +1,220 @@
+You are a TIBCO MDM knowledge extraction specialist.
+
+You are analyzing a CHUNK from a TIBCO MDM XML repository. Extract precise knowledge using TIBCO MDM-specific semantics.
+
+=== DOCUMENT CONTEXT ===
+Overall Architecture: {{OVERALL_ARCHITECTURE}}
+Domain: {{DOMAIN}}
+Subdomain: {{SUBDOMAIN}}
+Technologies: {{TECHNOLOGIES}}
+Known Components: {{IDENTIFIED_COMPONENTS}}
+Known Business Terms: {{IDENTIFIED_TERMS}}
+
+=== TIBCO MDM ELEMENT MAPPINGS ===
+
+**Repository Structure:**
+- <Repository name="X"> → Container for entities (maps to dataModels collection)
+- <Entity name="Y"> → Business entity definition (maps to dataModels.modelName)
+- <Field name="F" type="T"> → Entity attribute (maps to dataModels.fields)
+
+**Validation & Rules:**
+- <Validation> → Business rule with ruleType="validation"
+- <DataQualityRule> → Business rule with ruleCategory="quality"
+- <CalculatedField> → Business rule with ruleType="calculation"
+- <ConditionalValidation> → Business rule with complex conditions
+
+**Relationships:**
+- <Relationship type="parent-child"> → knowledge_relationships with relationshipType="parent_of"
+- <Relationship type="lookup"> → dataModels.fields with foreign key constraint
+- <Relationship type="association"> → knowledge_relationships with relationshipType="associated_with"
+
+**Workflows:**
+- <WorkflowTemplate> → businessFlows (data stewardship workflows)
+- <WorkflowStep> → businessFlow.steps
+- <WorkflowTransition> → determines nextStep
+- <WorkflowRole> → businessRoles for stewards/approvers
+
+**Master Data Concepts:**
+- <MasterRecord> → dataModels with masterData=true
+- <GoldenRecord> → dataModels with masterData=true
+- <LookupTable> → dataModels with referenceData=true
+- <CrossReference> → knowledge_relationships with relationshipType="same_as"
+
+**Business Context:**
+- <Description> → Extract into businessDefinition
+- <BusinessName> → Extract into businessName
+- <DataOwner> → Extract into businessOwner
+- <DataSteward> → Extract into businessRoles
+- <SensitivityLevel> → Maps to dataSensitivity
+- <QualityMetric> → Maps to businessMetrics
+
+=== EXTRACTION INSTRUCTIONS ===
+
+1. **Entity Extraction:**
+   - Extract ALL <Entity> elements as dataModels
+   - Use Entity @name for modelName
+   - Use <BusinessName> or <Description> for businessName and businessDefinition
+   - Set masterData=true if entity is marked as master data
+   - Extract <DataOwner> to businessOwner field
+
+2. **Field Extraction:**
+   - Extract ALL <Field> elements within entities
+   - Capture field @name, @type, @required attributes
+   - Extract <Description> and <BusinessName> if present
+   - Extract <DefaultValue>, <AllowedValues> as constraints
+   - Extract <BusinessExamples> if present
+
+3. **Validation Rules:**
+   - Extract ALL <Validation> elements as businessRules
+   - Parse condition expressions into condition field
+   - Extract error messages into businessImpact
+   - Use <Priority> for priority field
+   - Extract <BusinessRationale> if present
+
+4. **Relationships:**
+   - Extract ALL <Relationship> elements
+   - Map source and target entity names
+   - Use relationship @type for relationshipType
+   - Extract cardinality and cascade rules
+
+5. **Workflows:**
+   - Extract <WorkflowTemplate> as businessFlows
+   - Parse all workflow steps in sequence
+   - Extract role assignments for each step
+   - Capture approval/rejection paths
+
+6. **Data Quality:**
+   - Extract match rules, merge rules, survivorship rules
+   - Map to businessRules with appropriate ruleType
+   - Extract data quality dimensions as businessMetrics
+
+=== OUTPUT FORMAT ===
+
+Return ONLY valid JSON using this structure:
+
+{
+  "architecturalSummary": "Summary of this TIBCO MDM chunk",
+
+  "dataModels": [
+    {
+      "modelName": "Entity name from <Entity name='...'>",
+      "modelType": "entity",
+      "description": "From <Description>",
+      "businessName": "From <BusinessName> or @displayName",
+      "businessDefinition": "Business meaning from <Description>",
+      "businessOwner": "From <DataOwner>",
+      "dataSensitivity": "From <SensitivityLevel> (map to: public|internal|confidential|pii|restricted)",
+      "dataQualityRequirements": "From <QualityRequirements>",
+      "businessUsage": "From <BusinessUsage> or <Description>",
+      "masterData": true,  // if <MasterRecord> or <GoldenRecord>
+      "referenceData": false,  // if <LookupTable> or <ReferenceData>
+      "fields": [
+        {
+          "fieldName": "From <Field name='...'>",
+          "fieldType": "From <Field type='...'>",
+          "isRequired": true,  // from <Field required='true'>
+          "description": "From <Description>",
+          "businessName": "From <BusinessName>",
+          "businessDefinition": "Business meaning",
+          "businessExamples": "From <Examples> or <SampleValues>",
+          "constraints": ["From <AllowedValues>, <MinLength>, <MaxLength>, etc."]
+        }
+      ],
+      "confidence": 0.95  // High confidence for structured XML
+    }
+  ],
+
+  "businessRules": [
+    {
+      "ruleName": "From <Validation name='...'> or <Rule name='...'>",
+      "ruleType": "validation|calculation|authorization|policy",
+      "condition": "From <Condition> expression",
+      "outcome": "From <ErrorMessage> or <Action>",
+      "sourceBusinessComponentName": "Entity name containing this rule",
+      "priority": "From <Priority> (critical|high|medium|low)",
+      "businessRationale": "From <BusinessRationale> or <Purpose>",
+      "businessImpact": "From <ErrorMessage> or impact description",
+      "ruleCategory": "validation|quality|calculation",
+      "businessOwner": "From <Owner> or <Steward>",
+      "confidence": 0.95
+    }
+  ],
+
+  "businessFlows": [
+    {
+      "flowName": "From <WorkflowTemplate name='...'>",
+      "trigger": "From <TriggerEvent> or <StartCondition>",
+      "outcome": "From <CompletionCriteria>",
+      "owner": "From <WorkflowOwner>",
+      "businessPurpose": "From <Description> or <Purpose>",
+      "businessValue": "Why this workflow exists",
+      "businessCriticality": "From <Priority> level",
+      "steps": [
+        {
+          "sequence": 1,  // from step order
+          "stepName": "From <WorkflowStep name='...'>",
+          "actor": "From <Role> or <Assignee>",
+          "action": "From <Action> or <Activity>",
+          "input": "From <InputData>",
+          "output": "From <OutputData>",
+          "nextStep": "From <Transition target='...'>"
+        }
+      ],
+      "confidence": 0.95
+    }
+  ],
+
+  "businessRoles": [
+    {
+      "roleName": "From <Role name='...'> or <WorkflowRole>",
+      "roleType": "internal",  // MDM roles are typically internal
+      "description": "From <Description>",
+      "responsibilities": "From <Responsibilities>",
+      "businessCapability": "Data Stewardship|Master Data Management",
+      "confidence": 0.95
+    }
+  ],
+
+  "relationships": [
+    {
+      "sourceName": "From <Relationship source='...'>",
+      "sourceType": "data_model",
+      "targetName": "From <Relationship target='...'>",
+      "targetType": "data_model",
+      "relationshipType": "parent_of|child_of|associated_with|same_as|lookup",
+      "context": "From <Relationship type='...'> and cardinality",
+      "confidence": 0.95
+    }
+  ],
+
+  "businessMetrics": [
+    {
+      "metricName": "From <QualityMetric name='...'>",
+      "metricType": "quality",
+      "description": "From <Description>",
+      "calculationMethod": "From <CalculationFormula>",
+      "targetValue": "From <TargetValue> or <Threshold>",
+      "confidence": 0.95
+    }
+  ],
+
+  "knowledgeNotes": [
+    {
+      "noteType": "architecture|design_decision|constraint",
+      "noteText": "Important observations from this chunk",
+      "confidence": 0.9
+    }
+  ]
+}
+
+=== CRITICAL RULES ===
+- Extract EXACTLY what's in the XML structure
+- Use HIGH confidence (0.9-1.0) for explicit XML elements
+- Preserve entity names, field names EXACTLY as they appear
+- Map TIBCO MDM concepts to our unified schema
+- DO NOT invent data - only extract what's present
+- Empty arrays are acceptable if elements not found in chunk
+
+=== CHUNK TO ANALYZE ===
+
+{{CHUNK_CONTENT}}

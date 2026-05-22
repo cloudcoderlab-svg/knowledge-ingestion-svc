@@ -1,5 +1,5 @@
-server:
-  port: 8080
+# Development-specific configuration overrides
+# This file only contains properties that differ from application.yml
 
 logging:
   level:
@@ -11,28 +11,22 @@ spring:
   datasource:
     url: jdbc:postgresql://${KENGINE_DB_HOST:10.196.140.215}:${KENGINE_DB_PORT:5432}/${KENGINE_DB_NAME:kengine-db}
     username: ${KENGINE_DB_USER:kengine_app}
-    password: ${KENGINE_DB_PASSWORD:Admin@123}
+    password: ${KENGINE_DB_PASSWORD:}
+  jpa:
+    properties:
+      hibernate:
+        jdbc:
+          batch_size: 20
   liquibase:
-    change-log: classpath:/db/changelog/db.changelog-master.yaml
+    enabled: true
+    change-log: classpath:/db/changelog/db.changelog-master.xml
 
 cloudsql:
   instance-id: gpc-d-disc-postgresdb
-  database: kengine-db
-  schema: public
   user: kengine_app
 
 gcp:
   project-id: gpc-d-disc
-  pubsub:
-    subscription-id: kengine-knowledge-topic-sub
 
 vertex:
   project-id: gpc-d-disc
-  location: us-central1
-  classification-model-name: gemini-2.5-flash
-  embedding-model-name: text-embedding-005
-
-ingestion:
-  chunk:
-    max-chars: 3000
-    overlap-chars: 300

@@ -4,8 +4,12 @@ import com.google.cloud.aiplatform.v1.PredictResponse;
 import com.google.cloud.aiplatform.v1.PredictionServiceClient;
 import com.google.cloud.aiplatform.v1.PredictionServiceSettings;
 import com.google.cloud.vertexai.VertexAI;
+import com.google.cloud.vertexai.api.Content;
 import com.google.cloud.vertexai.api.GenerateContentResponse;
+import com.google.cloud.vertexai.generativeai.ContentMaker;
 import com.google.cloud.vertexai.generativeai.GenerativeModel;
+import com.google.cloud.vertexai.generativeai.PartMaker;
+import com.google.cloud.vertexai.generativeai.ResponseHandler;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
 import java.util.List;
@@ -53,6 +57,29 @@ public class VertexAIClient {
       return response.getCandidates(0).getContent().getParts(0).getText();
     } catch (Exception e) {
       throw new RuntimeException("Failed to call Vertex AI", e);
+    }
+  }
+
+  /**
+   * Generates content using both text and image/document input. This is used for multimodal
+   * document analysis (PDFs, images with diagrams, etc.)
+   *
+   * @param prompt the text prompt
+   * @param imageData the document/image binary data
+   * @param mimeType the MIME type of the data (e.g., "application/pdf", "image/png")
+   * @return the generated response text
+   */
+  public String generateWithImage(String prompt, byte[] imageData, String mimeType) {
+    try {
+      // Create multimodal content with text prompt and document/image
+      Content content =
+          ContentMaker.fromMultiModalData(
+              prompt, PartMaker.fromMimeTypeAndData(mimeType, imageData));
+
+      GenerateContentResponse response = classificationModel.generateContent(content);
+      return ResponseHandler.getText(response);
+    } catch (Exception e) {
+      throw new RuntimeException("Failed to call Vertex AI with multimodal input", e);
     }
   }
 

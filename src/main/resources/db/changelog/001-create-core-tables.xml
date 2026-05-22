@@ -1,0 +1,269 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+    http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.20.xsd">
+
+    <!-- ============================================================================ -->
+    <!-- Core Tables - Project Hierarchy and Artifact Management                     -->
+    <!-- ============================================================================ -->
+    <!-- This changelog creates foundational tables for project structure and         -->
+    <!-- document ingestion in the KNOWLEDGE schema.                                  -->
+    <!-- Vector embeddings are included for RAG (Retrieval Augmented Generation).     -->
+    <!-- ============================================================================ -->
+
+    <!-- Projects Table -->
+    <changeSet id="001-create-projects-table" author="system">
+        <createTable schemaName="knowledge" tableName="projects">
+            <column name="project_id" type="text">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="project_name" type="text">
+                <constraints nullable="false"/>
+            </column>
+            <column name="source_bucket" type="text">
+                <constraints nullable="false"/>
+            </column>
+            <column name="gcs_prefix" type="text">
+                <constraints nullable="false"/>
+            </column>
+            <column name="created_at" type="timestamptz" defaultValueComputed="CURRENT_TIMESTAMP"/>
+            <column name="updated_at" type="timestamptz" defaultValueComputed="CURRENT_TIMESTAMP"/>
+        </createTable>
+    </changeSet>
+
+    <!-- Domains Table -->
+    <changeSet id="001-create-domains-table" author="system">
+        <createTable schemaName="knowledge" tableName="domains">
+            <column name="project_id" type="text">
+                <constraints nullable="false"/>
+            </column>
+            <column name="domain" type="text">
+                <constraints nullable="false"/>
+            </column>
+            <column name="created_at" type="timestamptz" defaultValueComputed="CURRENT_TIMESTAMP"/>
+            <column name="updated_at" type="timestamptz" defaultValueComputed="CURRENT_TIMESTAMP"/>
+        </createTable>
+        <addPrimaryKey schemaName="knowledge" tableName="domains" columnNames="project_id, domain"/>
+        <addForeignKeyConstraint
+            baseTableSchemaName="knowledge"
+            baseTableName="domains"
+            baseColumnNames="project_id"
+            constraintName="fk_domain_project"
+            referencedTableSchemaName="knowledge"
+            referencedTableName="projects"
+            referencedColumnNames="project_id"
+            onDelete="CASCADE"/>
+    </changeSet>
+
+    <!-- Subdomains Table -->
+    <changeSet id="001-create-subdomains-table" author="system">
+        <createTable schemaName="knowledge" tableName="subdomains">
+            <column name="project_id" type="text">
+                <constraints nullable="false"/>
+            </column>
+            <column name="domain" type="text">
+                <constraints nullable="false"/>
+            </column>
+            <column name="subdomain" type="text">
+                <constraints nullable="false"/>
+            </column>
+            <column name="created_at" type="timestamptz" defaultValueComputed="CURRENT_TIMESTAMP"/>
+            <column name="updated_at" type="timestamptz" defaultValueComputed="CURRENT_TIMESTAMP"/>
+        </createTable>
+        <addPrimaryKey schemaName="knowledge" tableName="subdomains" columnNames="project_id, domain, subdomain"/>
+        <addForeignKeyConstraint
+            baseTableSchemaName="knowledge"
+            baseTableName="subdomains"
+            baseColumnNames="project_id, domain"
+            constraintName="fk_subdomain_domain"
+            referencedTableSchemaName="knowledge"
+            referencedTableName="domains"
+            referencedColumnNames="project_id, domain"
+            onDelete="CASCADE"/>
+    </changeSet>
+
+    <!-- Artifacts Table -->
+    <changeSet id="001-create-artifacts-table" author="system">
+        <createTable schemaName="knowledge" tableName="artifacts">
+            <column name="artifact_id" type="varchar(36)">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="project_id" type="text">
+                <constraints nullable="false"/>
+            </column>
+            <column name="domain" type="text"/>
+            <column name="subdomain" type="text"/>
+            <column name="source_bucket" type="text">
+                <constraints nullable="false"/>
+            </column>
+            <column name="source_object" type="text">
+                <constraints nullable="false"/>
+            </column>
+            <column name="source_generation" type="bigint"/>
+            <column name="source_checksum" type="text"/>
+            <column name="content_hash" type="varchar(64)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="artifact_type" type="text">
+                <constraints nullable="false"/>
+            </column>
+            <column name="file_type" type="text">
+                <constraints nullable="false"/>
+            </column>
+            <column name="title" type="text">
+                <constraints nullable="false"/>
+            </column>
+            <column name="version" type="text"/>
+            <column name="is_current" type="boolean" defaultValueBoolean="true">
+                <constraints nullable="false"/>
+            </column>
+            <column name="created_at" type="timestamptz" defaultValueComputed="CURRENT_TIMESTAMP"/>
+            <column name="updated_at" type="timestamptz" defaultValueComputed="CURRENT_TIMESTAMP"/>
+        </createTable>
+        <addForeignKeyConstraint
+            baseTableSchemaName="knowledge"
+            baseTableName="artifacts"
+            baseColumnNames="project_id"
+            constraintName="fk_artifact_project"
+            referencedTableSchemaName="knowledge"
+            referencedTableName="projects"
+            referencedColumnNames="project_id"
+            onDelete="CASCADE"/>
+        <addForeignKeyConstraint
+            baseTableSchemaName="knowledge"
+            baseTableName="artifacts"
+            baseColumnNames="project_id, domain, subdomain"
+            constraintName="fk_artifact_subdomain"
+            referencedTableSchemaName="knowledge"
+            referencedTableName="subdomains"
+            referencedColumnNames="project_id, domain, subdomain"
+            onDelete="SET NULL"/>
+    </changeSet>
+
+    <!-- Ingestion Documents Table -->
+    <changeSet id="001-create-ingestion-documents-table" author="system">
+        <createTable schemaName="knowledge" tableName="ingestion_documents">
+            <column name="document_id" type="varchar(36)">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="artifact_id" type="varchar(36)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="project_id" type="text">
+                <constraints nullable="false"/>
+            </column>
+            <column name="source_bucket" type="text">
+                <constraints nullable="false"/>
+            </column>
+            <column name="source_object" type="text">
+                <constraints nullable="false"/>
+            </column>
+            <column name="source_generation" type="bigint"/>
+            <column name="source_checksum" type="text"/>
+            <column name="content_hash" type="varchar(64)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="chunk_count" type="bigint" defaultValueNumeric="0">
+                <constraints nullable="false"/>
+            </column>
+            <column name="created_at" type="timestamptz" defaultValueComputed="CURRENT_TIMESTAMP"/>
+        </createTable>
+        <addForeignKeyConstraint
+            baseTableSchemaName="knowledge"
+            baseTableName="ingestion_documents"
+            baseColumnNames="artifact_id"
+            constraintName="fk_document_artifact"
+            referencedTableSchemaName="knowledge"
+            referencedTableName="artifacts"
+            referencedColumnNames="artifact_id"
+            onDelete="CASCADE"/>
+        <addForeignKeyConstraint
+            baseTableSchemaName="knowledge"
+            baseTableName="ingestion_documents"
+            baseColumnNames="project_id"
+            constraintName="fk_document_project"
+            referencedTableSchemaName="knowledge"
+            referencedTableName="projects"
+            referencedColumnNames="project_id"
+            onDelete="CASCADE"/>
+    </changeSet>
+
+    <!-- Semantic Chunks Table - Primary table for RAG with vector embeddings -->
+    <changeSet id="001-create-semantic-chunks-table" author="system">
+        <createTable schemaName="knowledge" tableName="semantic_chunks">
+            <column name="chunk_id" type="varchar(36)">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="document_id" type="varchar(36)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="artifact_id" type="varchar(36)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="project_id" type="text">
+                <constraints nullable="false"/>
+            </column>
+            <column name="source_bucket" type="text">
+                <constraints nullable="false"/>
+            </column>
+            <column name="source_object" type="text">
+                <constraints nullable="false"/>
+            </column>
+            <column name="source_generation" type="bigint"/>
+            <column name="source_checksum" type="text"/>
+            <column name="document_content_hash" type="varchar(64)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="chunk_index" type="bigint">
+                <constraints nullable="false"/>
+            </column>
+            <column name="total_chunks" type="bigint">
+                <constraints nullable="false"/>
+            </column>
+            <column name="char_start" type="bigint">
+                <constraints nullable="false"/>
+            </column>
+            <column name="char_end" type="bigint">
+                <constraints nullable="false"/>
+            </column>
+            <column name="chunk_content_hash" type="varchar(64)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="domain" type="text"/>
+            <column name="subdomain" type="text"/>
+            <column name="content" type="text"/>
+            <column name="embedding" type="vector(768)" remarks="Vector embedding for RAG semantic search (768-dim from text-embedding-005)"/>
+            <column name="created_at" type="timestamptz" defaultValueComputed="CURRENT_TIMESTAMP"/>
+        </createTable>
+        <addForeignKeyConstraint
+            baseTableSchemaName="knowledge"
+            baseTableName="semantic_chunks"
+            baseColumnNames="artifact_id"
+            constraintName="fk_chunk_artifact"
+            referencedTableSchemaName="knowledge"
+            referencedTableName="artifacts"
+            referencedColumnNames="artifact_id"
+            onDelete="CASCADE"/>
+        <addForeignKeyConstraint
+            baseTableSchemaName="knowledge"
+            baseTableName="semantic_chunks"
+            baseColumnNames="document_id"
+            constraintName="fk_chunk_document"
+            referencedTableSchemaName="knowledge"
+            referencedTableName="ingestion_documents"
+            referencedColumnNames="document_id"
+            onDelete="CASCADE"/>
+        <addForeignKeyConstraint
+            baseTableSchemaName="knowledge"
+            baseTableName="semantic_chunks"
+            baseColumnNames="project_id, domain, subdomain"
+            constraintName="fk_chunk_subdomain"
+            referencedTableSchemaName="knowledge"
+            referencedTableName="subdomains"
+            referencedColumnNames="project_id, domain, subdomain"
+            onDelete="SET NULL"/>
+    </changeSet>
+
+</databaseChangeLog>

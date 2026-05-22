@@ -14,5 +14,7 @@ public record GenericKnowledgeSnapshot(
     List<Map<String, Object>> deploymentResourceConfigs,
     List<Map<String, Object>> knowledgeRelationships,
     List<Map<String, Object>> knowledgeNotes,
+    List<Map<String, Object>> knowledgeDataModels,
+    List<Map<String, Object>> knowledgeDataFields,
     List<Map<String, Object>> usageProfiles,
     List<Map<String, Object>> resourceCostEstimates) {}

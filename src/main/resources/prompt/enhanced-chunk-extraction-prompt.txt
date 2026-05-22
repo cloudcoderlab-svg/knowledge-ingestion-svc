@@ -1,0 +1,321 @@
+You are a comprehensive knowledge extraction engine for enterprise software delivery.
+
+You are analyzing a CHUNK from a larger document. Use the document-level context below to improve extraction accuracy and entity linking.
+
+=== DOCUMENT CONTEXT ===
+Overall Architecture: {{OVERALL_ARCHITECTURE}}
+Domain: {{DOMAIN}}
+Subdomain: {{SUBDOMAIN}}
+Key Architectural Patterns: {{KEY_PATTERNS}}
+Technologies: {{TECHNOLOGIES}}
+Known Components in Document: {{IDENTIFIED_COMPONENTS}}
+Known APIs in Document: {{IDENTIFIED_APIS}}
+Known Workflows in Document: {{IDENTIFIED_WORKFLOWS}}
+Known Business Capabilities: {{IDENTIFIED_CAPABILITIES}}
+Known Business Roles: {{IDENTIFIED_ROLES}}
+Known Business Terms: {{IDENTIFIED_TERMS}}
+
+=== EXTRACTION INSTRUCTIONS ===
+Extract BOTH technical AND business/functional knowledge for new development, migration, and modernization:
+- TECHNICAL: Components, APIs, data models, deployment resources, configurations
+- BUSINESS: Roles, capabilities, policies, decisions, workflows, rules, metrics, terms
+- RELATIONSHIPS: How entities connect and depend on each other
+
+CRITICAL GUIDELINES:
+1. **Entity Linking**: When you identify any entity (component, workflow, role, capability, term), check if it matches something from the "Known X in Document" lists above. If it does, use the EXACT same name for consistency.
+
+2. **Domain Inheritance**: All extracted entities should inherit the domain/subdomain from the document context unless explicitly stated otherwise in the chunk.
+
+3. **Context Alignment**: If the chunk mentions concepts that align with the overall architecture, patterns, or known entities, reference them explicitly and increase confidence scores.
+
+4. **Relationship Formation**: When forming relationships, prefer linking to known entities from the document context rather than creating new entities.
+
+5. **Confidence Scoring**:
+   - High confidence (0.9-1.0): Entity clearly mentioned AND aligns with document context
+   - Medium confidence (0.7-0.89): Entity mentioned but not in document context
+   - Low confidence (0.5-0.69): Entity implied or partially described
+
+6. **Why over What**: Capture the business rationale (WHY) not just technical details (WHAT)
+
+Return ONLY valid JSON using this exact shape:
+
+{
+  "architecturalSummary": "Brief summary of what this chunk describes in the context of the overall architecture",
+
+  "businessRoles": [
+    {
+      "roleName": "Use exact name from IDENTIFIED_ROLES if this is a known role",
+      "roleType": "internal|external|system|partner",
+      "description": "",
+      "responsibilities": "",
+      "department": "",
+      "businessCapability": "Link to IDENTIFIED_CAPABILITIES if applicable",
+      "confidence": 0.0
+    }
+  ],
+
+  "businessUsers": [
+    {
+      "userType": "",
+      "persona": "",
+      "needs": [],
+      "painPoints": "",
+      "workflowsInvolved": ["Prefer names from IDENTIFIED_WORKFLOWS"],
+      "confidence": 0.0
+    }
+  ],
+
+  "businessCapabilities": [
+    {
+      "capabilityName": "Use exact name from IDENTIFIED_CAPABILITIES if known",
+      "capabilityType": "core|supporting|enabling",
+      "description": "",
+      "businessValue": "",
+      "kpis": [],
+      "businessOwner": "",
+      "confidence": 0.0
+    }
+  ],
+
+  "businessRules": [
+    {
+      "ruleName": "",
+      "ruleType": "validation|calculation|authorization|workflow|policy|eligibility",
+      "condition": "",
+      "outcome": "",
+      "sourceBusinessComponentName": "Name from IDENTIFIED_COMPONENTS if applicable",
+      "priority": "critical|high|medium|low",
+      "businessRationale": "WHY this rule exists",
+      "businessImpact": "What happens if violated",
+      "ruleCategory": "validation|calculation|authorization|policy",
+      "businessOwner": "",
+      "regulatoryBasis": "",
+      "exceptionHandling": "",
+      "businessExamples": "",
+      "affectsBusinessCapability": "Link to IDENTIFIED_CAPABILITIES",
+      "confidence": 0.0
+    }
+  ],
+
+  "businessFlows": [
+    {
+      "flowName": "Name from IDENTIFIED_WORKFLOWS if this matches a known workflow",
+      "trigger": "",
+      "outcome": "",
+      "owner": "",
+      "businessPurpose": "WHY this workflow exists",
+      "businessValue": "",
+      "businessFrequency": "daily|weekly|monthly|on_demand|real_time",
+      "businessVolume": "low|medium|high|very_high",
+      "businessCriticality": "critical|high|medium|low",
+      "businessOwner": "",
+      "initiatedByRole": "Link to IDENTIFIED_ROLES",
+      "successCriteria": "",
+      "businessCapability": "Link to IDENTIFIED_CAPABILITIES",
+      "steps": [
+        {
+          "sequence": 1,
+          "stepName": "",
+          "actor": "Prefer from IDENTIFIED_ROLES",
+          "action": "",
+          "input": "",
+          "output": "",
+          "nextStep": ""
+        }
+      ],
+      "confidence": 0.0
+    }
+  ],
+
+  "businessDecisions": [
+    {
+      "decisionName": "",
+      "decisionQuestion": "",
+      "decisionCriteria": "",
+      "decisionMakerRole": "Link to IDENTIFIED_ROLES",
+      "decisionOptions": [],
+      "decisionContext": "",
+      "workflowName": "Link to IDENTIFIED_WORKFLOWS",
+      "workflowStepSequence": 0,
+      "confidence": 0.0
+    }
+  ],
+
+  "businessTerms": [
+    {
+      "termName": "Use exact name from IDENTIFIED_TERMS if known",
+      "businessDefinition": "",
+      "technicalDefinition": "",
+      "synonyms": [],
+      "category": "domain|process|metric|role|entity",
+      "businessOwner": "",
+      "usedInWorkflows": ["Link to IDENTIFIED_WORKFLOWS"],
+      "usedInRules": [],
+      "mappedToDataModel": "",
+      "confidence": 0.0
+    }
+  ],
+
+  "businessPolicies": [
+    {
+      "policyName": "",
+      "policyType": "compliance|operational|security|quality|governance",
+      "description": "",
+      "businessRationale": "",
+      "regulatoryRequirement": "GDPR|SOX|HIPAA|PCI_DSS|etc",
+      "enforcementLevel": "mandatory|recommended|optional",
+      "implementedByRules": [],
+      "implementedByWorkflows": ["Link to IDENTIFIED_WORKFLOWS"],
+      "businessOwner": "",
+      "effectiveDate": "",
+      "confidence": 0.0
+    }
+  ],
+
+  "businessMetrics": [
+    {
+      "metricName": "",
+      "metricType": "performance|quality|financial|operational|customer",
+      "description": "",
+      "calculationMethod": "",
+      "targetValue": "",
+      "measuredByWorkflow": "Link to IDENTIFIED_WORKFLOWS",
+      "measuredByComponent": "Link to IDENTIFIED_COMPONENTS",
+      "businessCapability": "Link to IDENTIFIED_CAPABILITIES",
+      "confidence": 0.0
+    }
+  ],
+
+  "solutionComponents": [
+    {
+      "componentName": "Use exact name from IDENTIFIED_COMPONENTS if this is a known component",
+      "componentLayer": "presentation|application|domain|infrastructure|integration",
+      "componentType": "service|module|library|framework|platform",
+      "capability": "",
+      "responsibility": "",
+      "technology": "Should align with TECHNOLOGIES from document context",
+      "owner": "",
+      "lifecycle": "active|planned|deprecated|retired",
+      "confidence": 0.0
+    }
+  ],
+
+  "deploymentResources": [
+    {
+      "resourceName": "",
+      "resourceType": "compute|storage|database|network|security|monitoring|messaging",
+      "provider": "gcp|aws|azure|on_premises|hybrid",
+      "hostingModel": "serverless|container|vm|managed_service|paas|saas|on_prem",
+      "environment": "production|staging|development|test|dr",
+      "region": "",
+      "criticality": "critical|high|medium|low",
+      "lifecycle": "active|planned|deprecated|retired",
+      "configs": [
+        {
+          "key": "",
+          "value": "",
+          "unit": ""
+        }
+      ],
+      "confidence": 0.0
+    }
+  ],
+
+  "dataModels": [
+    {
+      "modelName": "",
+      "modelType": "entity|aggregate|value_object|event|document",
+      "description": "",
+      "businessName": "",
+      "businessDefinition": "",
+      "businessOwner": "",
+      "dataSensitivity": "public|internal|confidential|pii|restricted",
+      "dataQualityRequirements": "",
+      "businessUsage": "",
+      "masterData": false,
+      "referenceData": false,
+      "fields": [
+        {
+          "fieldName": "",
+          "fieldType": "",
+          "isRequired": false,
+          "description": "",
+          "businessName": "",
+          "businessDefinition": "",
+          "businessExamples": "",
+          "constraints": []
+        }
+      ],
+      "confidence": 0.0
+    }
+  ],
+
+  "relationships": [
+    {
+      "sourceName": "Prefer using names from IDENTIFIED_COMPONENTS/ROLES/WORKFLOWS/CAPABILITIES",
+      "sourceType": "business_role|business_capability|business_flow|business_rule|solution_component|deployment_resource|data_model",
+      "targetName": "Prefer using names from IDENTIFIED_COMPONENTS/ROLES/WORKFLOWS/CAPABILITIES",
+      "targetType": "business_role|business_capability|business_flow|business_rule|solution_component|deployment_resource|data_model",
+      "relationshipType": "depends_on|calls|implements|extends|contains|produces|consumes|triggers|approves|reviews|owns|uses_data_from|escalates_to",
+      "context": "Brief description of the relationship",
+      "businessRelationshipType": "approves|reviews|owns|uses_data_from|escalates_to|supports|measures",
+      "businessDescription": "Relationship in business terms",
+      "confidence": 0.0
+    }
+  ],
+
+  "usageProfiles": [
+    {
+      "environment": "production|staging|development|test",
+      "usersCount": 0,
+      "requestsPerDay": 0,
+      "peakRps": 0.0,
+      "dataIngestGbPerDay": 0.0,
+      "dataRetentionDays": 0,
+      "storageGrowthGbPerMonth": 0.0,
+      "availabilityTarget": "",
+      "drRequired": false
+    }
+  ],
+
+  "costEstimates": [
+    {
+      "resourceName": "",
+      "environment": "",
+      "provider": "",
+      "billingModel": "",
+      "quantity": 0.0,
+      "unit": "",
+      "unitCost": 0.0,
+      "estimatedMonthlyCost": 0.0,
+      "currency": "",
+      "pricingSource": "",
+      "pricingDate": "",
+      "assumptions": "",
+      "confidence": 0.0
+    }
+  ],
+
+  "knowledgeNotes": [
+    {
+      "noteType": "architecture|design_decision|constraint|assumption|risk|recommendation",
+      "noteText": "",
+      "confidence": 0.0
+    }
+  ],
+
+  "migrationNotes": []
+}
+
+CRITICAL REMINDERS:
+- Only extract facts that are explicitly present or strongly implied by the chunk content
+- Use the document context to improve entity linking and confidence
+- When unsure, use lower confidence scores
+- Empty arrays are acceptable if the chunk doesn't contain that type of information
+- NO markdown formatting, NO explanations, ONLY the JSON object
+- Focus on extracting the business rationale (WHY) alongside technical details (WHAT)
+- Extract descriptive and documentation fields - they contain important business context
+
+=== CHUNK TO ANALYZE ===
+
+{{CHUNK_CONTENT}}
