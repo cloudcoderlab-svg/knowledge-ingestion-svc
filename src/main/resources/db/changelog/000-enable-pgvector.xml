@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+    http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.20.xsd">
+
+    <!-- ============================================================================ -->
+    <!-- PostgreSQL pgvector Extension Setup                                         -->
+    <!-- ============================================================================ -->
+    <!-- This MUST run before any table creation to enable the vector data type.     -->
+    <!-- The vector type is used for storing embeddings (768 dimensions) for         -->
+    <!-- semantic search with RAG using Google Vertex AI text-embedding-005 model.   -->
+    <!-- ============================================================================ -->
+
+    <changeSet id="000-enable-pgvector-extension" author="system">
+        <preConditions onFail="MARK_RAN">
+            <sqlCheck expectedResult="0">
+                SELECT COUNT(*) FROM pg_extension WHERE extname = 'vector'
+            </sqlCheck>
+        </preConditions>
+        <sql>CREATE EXTENSION IF NOT EXISTS vector;</sql>
+        <rollback>DROP EXTENSION IF EXISTS vector CASCADE;</rollback>
+    </changeSet>
+
+</databaseChangeLog>
