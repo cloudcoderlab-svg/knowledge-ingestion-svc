@@ -51,6 +51,30 @@ public class KnowledgeDataModelEntity {
   @Column(name = "embedding", columnDefinition = "vector(768)")
   private List<Double> embedding;
 
+  @Column(name = "business_name", length = 500)
+  private String businessName;
+
+  @Column(name = "business_definition", columnDefinition = "text")
+  private String businessDefinition;
+
+  @Column(name = "business_owner", length = 255)
+  private String businessOwner;
+
+  @Column(name = "data_sensitivity", length = 100)
+  private String dataSensitivity;
+
+  @Column(name = "data_quality_requirements", columnDefinition = "text")
+  private String dataQualityRequirements;
+
+  @Column(name = "business_usage", columnDefinition = "text")
+  private String businessUsage;
+
+  @Column(name = "master_data")
+  private Boolean masterData;
+
+  @Column(name = "reference_data")
+  private Boolean referenceData;
+
   @Column(name = "created_at")
   @CreationTimestamp
   private OffsetDateTime createdAt;

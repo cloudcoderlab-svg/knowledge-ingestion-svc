@@ -14,7 +14,6 @@ import com.google.cloud.vertexai.generativeai.GenerativeModel;
 import com.google.protobuf.ListValue;
 import com.google.protobuf.Struct;
 import com.google.protobuf.Value;
-
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -34,7 +33,7 @@ class VertexAIClientTest {
   void setUp() {
     MockitoAnnotations.openMocks(this);
     ReflectionTestUtils.setField(
-            vertexAIService, "predictionServiceClient", predictionServiceClient);
+        vertexAIService, "predictionServiceClient", predictionServiceClient);
     ReflectionTestUtils.setField(vertexAIService, "classificationModel", classificationModel);
     ReflectionTestUtils.setField(vertexAIService, "projectId", "test-project");
     ReflectionTestUtils.setField(vertexAIService, "location", "us");

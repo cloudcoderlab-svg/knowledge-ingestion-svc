@@ -74,6 +74,12 @@ public class KnowledgeRelationshipEntity {
   @Column(name = "target_entity_id")
   private UUID targetEntityId;
 
+  @Column(name = "business_relationship_type", length = 100)
+  private String businessRelationshipType;
+
+  @Column(name = "business_description", columnDefinition = "text")
+  private String businessDescription;
+
   @Column(name = "created_at")
   @CreationTimestamp
   private OffsetDateTime createdAt;

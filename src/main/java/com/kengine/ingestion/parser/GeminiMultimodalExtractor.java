@@ -2,10 +2,10 @@ package com.kengine.ingestion.parser;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.kengine.ingestion.service.VertexAIService;
 import com.kengine.ingestion.dto.DiagramContent;
 import com.kengine.ingestion.dto.DocumentContent;
 import com.kengine.ingestion.dto.TableContent;
+import com.kengine.ingestion.service.VertexAIService;
 import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
 import java.util.ArrayList;

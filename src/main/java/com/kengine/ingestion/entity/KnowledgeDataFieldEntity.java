@@ -44,6 +44,22 @@ public class KnowledgeDataFieldEntity {
   @Column(name = "constraints", columnDefinition = "jsonb")
   private Map<String, Object> constraints;
 
+  @Column(name = "embedding", columnDefinition = "vector(768)")
+  private java.util.List<Double> embedding;
+
+  @Column(name = "business_name", length = 500)
+  private String businessName;
+
+  @Column(name = "business_definition", columnDefinition = "text")
+  private String businessDefinition;
+
+  @Column(name = "business_examples", columnDefinition = "text")
+  private String businessExamples;
+
+  @JdbcTypeCode(SqlTypes.JSON)
+  @Column(name = "business_rules", columnDefinition = "jsonb")
+  private Map<String, Object> businessRules;
+
   @Column(name = "created_at")
   @CreationTimestamp
   private OffsetDateTime createdAt;
