@@ -18,6 +18,7 @@ spring:
     properties:
       hibernate:
         format_sql: true
+        default_schema: knowledge
         jdbc:
           batch_size: 20
   liquibase:

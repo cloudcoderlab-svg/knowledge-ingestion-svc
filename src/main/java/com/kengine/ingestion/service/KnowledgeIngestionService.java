@@ -131,13 +131,13 @@ public class KnowledgeIngestionService {
     // ========================================================================
     // Save chunks to semantic_chunks table (unchanged)
     // ========================================================================
-    storageService.saveDocument(source, chunks);
+    String artifactId = storageService.saveDocument(source, chunks);
 
     // ========================================================================
     // PHASE 4: Build Knowledge Graph (NEW)
     // ========================================================================
     log.info("Building knowledge graph for artifact: {}", source.objectName());
-    knowledgeGraphService.buildKnowledgeGraph(source, docKnowledge, allChunkKnowledge);
+    knowledgeGraphService.buildKnowledgeGraph(artifactId, source, docKnowledge, allChunkKnowledge);
     log.info("Knowledge graph build completed");
 
     // Return classification from first chunk for backward compatibility
@@ -160,12 +160,15 @@ public class KnowledgeIngestionService {
   }
 
   private String projectIdFromObjectName(String objectName) {
-    int separator = objectName.indexOf('/');
-    if (separator <= 0) {
+    // Extract project ID from path: staged/{projectId}/{date}/file or
+    // processed/{projectId}/{date}/file
+    String[] parts = objectName.split("/");
+    if (parts.length < 3) {
       throw new IllegalArgumentException(
-          "GCS object must be stored under a project directory: " + objectName);
+          "GCS object must be stored under staged/{projectId}/{date}/ or processed/{projectId}/{date}/: "
+              + objectName);
     }
-    return objectName.substring(0, separator);
+    return parts[1]; // Return the project ID (second segment)
   }
 
   private String artifactType(String objectName) {

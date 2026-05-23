@@ -28,8 +28,8 @@ public class GcsFolderManagementService {
 
   private static final String STAGED_PREFIX = "staged/";
   private static final String PROCESSED_PREFIX = "processed/";
-  private static final DateTimeFormatter TIMESTAMP_FORMATTER =
-      DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH-mm-ss").withZone(ZoneOffset.UTC);
+  private static final DateTimeFormatter DATE_FORMATTER =
+      DateTimeFormatter.ofPattern("yyyy-MM-dd").withZone(ZoneOffset.UTC);
 
   /**
    * Creates project-specific folders in both staged and processed directories. Creates marker files
@@ -46,31 +46,14 @@ public class GcsFolderManagementService {
   }
 
   /**
-   * Creates timestamped folders for a project in both staged and processed directories. Returns the
-   * timestamp used for folder naming.
-   */
-  public String createTimestampedFolders(String projectId) {
-    String timestamp = TIMESTAMP_FORMATTER.format(Instant.now());
-
-    String stagedFolder = STAGED_PREFIX + projectId + "/" + timestamp + "/.folder";
-    String processedFolder = PROCESSED_PREFIX + projectId + "/" + timestamp + "/.folder";
-
-    createMarkerFile(stagedFolder);
-    createMarkerFile(processedFolder);
-
-    log.info("Created timestamped folders for project {}: {}", projectId, timestamp);
-    return timestamp;
-  }
-
-  /**
-   * Lists all files in a specific staged folder path (project + timestamp).
+   * Lists all files in a specific staged folder path (project + date).
    *
    * @param projectId Project identifier
-   * @param timestamp ISO timestamp folder name
+   * @param dateFolder Date folder name (yyyy-MM-dd)
    * @return List of blob names (full paths)
    */
-  public List<String> listFilesInStagedFolder(String projectId, String timestamp) {
-    String prefix = STAGED_PREFIX + projectId + "/" + timestamp + "/";
+  public List<String> listFilesInStagedFolder(String projectId, String dateFolder) {
+    String prefix = STAGED_PREFIX + projectId + "/" + dateFolder + "/";
     List<String> files = new ArrayList<>();
 
     storage
@@ -90,41 +73,14 @@ public class GcsFolderManagementService {
   }
 
   /**
-   * Lists all timestamped folders for a project in the staged directory. Returns folder names
-   * (timestamps only, not full paths).
-   */
-  public List<String> listTimestampedFolders(String projectId) {
-    String prefix = STAGED_PREFIX + projectId + "/";
-    List<String> folders = new ArrayList<>();
-
-    storage
-        .list(bucketName, BlobListOption.prefix(prefix), BlobListOption.currentDirectory())
-        .iterateAll()
-        .forEach(
-            blob -> {
-              String name = blob.getName();
-              // Extract folder name (timestamp) from path
-              if (name.startsWith(prefix) && name.length() > prefix.length()) {
-                String folderName = name.substring(prefix.length()).replaceAll("/$", "");
-                if (!folderName.isEmpty()) {
-                  folders.add(folderName);
-                }
-              }
-            });
-
-    log.debug("Found {} timestamped folders for project: {}", folders.size(), projectId);
-    return folders;
-  }
-
-  /**
    * Moves a file from staged to processed folder.
    *
    * @param stagedBlobName Full path of the staged file
    * @param projectId Project identifier
-   * @param timestamp Timestamp folder name
+   * @param dateFolder Date folder name (yyyy-MM-dd)
    * @return The new blob name in processed folder
    */
-  public String moveToProcessed(String stagedBlobName, String projectId, String timestamp) {
+  public String moveToProcessed(String stagedBlobName, String projectId, String dateFolder) {
     Blob stagedBlob = storage.get(BlobId.of(bucketName, stagedBlobName));
     if (stagedBlob == null) {
       log.warn("Staged blob not found: {}", stagedBlobName);
@@ -133,7 +89,7 @@ public class GcsFolderManagementService {
 
     // Extract filename from staged path
     String fileName = extractFileName(stagedBlobName);
-    String processedBlobName = PROCESSED_PREFIX + projectId + "/" + timestamp + "/" + fileName;
+    String processedBlobName = PROCESSED_PREFIX + projectId + "/" + dateFolder + "/" + fileName;
 
     // Copy to processed folder
     BlobId processedBlobId = BlobId.of(bucketName, processedBlobName);
@@ -153,6 +109,119 @@ public class GcsFolderManagementService {
   /** Creates the default project folder if it doesn't exist. */
   public void ensureDefaultProjectExists() {
     createProjectFolder("default-project");
+  }
+
+  /**
+   * Gets all files from today's daily dated folder in the staged directory for processing.
+   *
+   * @param projectId Project identifier
+   * @return List of file paths from today's staged folder
+   */
+  public List<String> getTodaysFilesForProcessing(String projectId) {
+    String today = DATE_FORMATTER.format(Instant.now());
+    List<String> files = listFilesInStagedFolder(projectId, today);
+
+    log.info(
+        "Found {} files for processing in staged/{}/{} for today", files.size(), projectId, today);
+    return files;
+  }
+
+  /**
+   * Lists all files in a specific processed folder path (project + date).
+   *
+   * @param projectId Project identifier
+   * @param dateFolder Date folder name (yyyy-MM-dd)
+   * @return List of blob names (full paths)
+   */
+  public List<String> listFilesInProcessedFolder(String projectId, String dateFolder) {
+    String prefix = PROCESSED_PREFIX + projectId + "/" + dateFolder + "/";
+    List<String> files = new ArrayList<>();
+
+    storage
+        .list(bucketName, BlobListOption.prefix(prefix))
+        .iterateAll()
+        .forEach(
+            blob -> {
+              String name = blob.getName();
+              // Exclude marker files and directory markers
+              if (!name.endsWith("/.folder") && !name.endsWith("/")) {
+                files.add(name);
+              }
+            });
+
+    log.debug("Found {} files in processed folder: {}", files.size(), prefix);
+    return files;
+  }
+
+  /**
+   * Gets all files from today's daily dated folder in the processed directory.
+   *
+   * @param projectId Project identifier
+   * @return List of file paths from today's processed folder
+   */
+  public List<String> getTodaysProcessedFiles(String projectId) {
+    String today = DATE_FORMATTER.format(Instant.now());
+    List<String> files = listFilesInProcessedFolder(projectId, today);
+
+    log.info(
+        "Found {} processed files in processed/{}/{} for today", files.size(), projectId, today);
+    return files;
+  }
+
+  /**
+   * Creates daily dated folders for a project in both staged and processed directories. Uses
+   * ISO-8601 date format (yyyy-MM-dd). Only creates if they don't already exist.
+   *
+   * @param projectId Project identifier
+   * @return The date string used for folder naming (yyyy-MM-dd)
+   */
+  public String createDailyDatedFolders(String projectId) {
+    String today = DATE_FORMATTER.format(Instant.now());
+
+    String stagedFolder = STAGED_PREFIX + projectId + "/" + today + "/.folder";
+    String processedFolder = PROCESSED_PREFIX + projectId + "/" + today + "/.folder";
+
+    // Check if folders already exist
+    BlobId stagedBlobId = BlobId.of(bucketName, stagedFolder);
+    BlobId processedBlobId = BlobId.of(bucketName, processedFolder);
+
+    boolean stagedExists = storage.get(stagedBlobId) != null;
+    boolean processedExists = storage.get(processedBlobId) != null;
+
+    if (stagedExists && processedExists) {
+      log.debug("Daily dated folders already exist for project {} on {}", projectId, today);
+      return today;
+    }
+
+    // Create folders if they don't exist
+    if (!stagedExists) {
+      createMarkerFile(stagedFolder);
+    }
+    if (!processedExists) {
+      createMarkerFile(processedFolder);
+    }
+
+    log.info("Created daily dated folders for project {} on {}", projectId, today);
+    return today;
+  }
+
+  /**
+   * Checks if daily dated folders exist for today for a project.
+   *
+   * @param projectId Project identifier
+   * @return true if both staged and processed folders exist for today
+   */
+  public boolean dailyDatedFoldersExist(String projectId) {
+    String today = DATE_FORMATTER.format(Instant.now());
+    String stagedFolder = STAGED_PREFIX + projectId + "/" + today + "/.folder";
+    String processedFolder = PROCESSED_PREFIX + projectId + "/" + today + "/.folder";
+
+    BlobId stagedBlobId = BlobId.of(bucketName, stagedFolder);
+    BlobId processedBlobId = BlobId.of(bucketName, processedFolder);
+
+    boolean exists = storage.get(stagedBlobId) != null && storage.get(processedBlobId) != null;
+    log.debug("Daily dated folders exist for project {} on {}: {}", projectId, today, exists);
+    return exists;
   }
 
   private void createMarkerFile(String path) {

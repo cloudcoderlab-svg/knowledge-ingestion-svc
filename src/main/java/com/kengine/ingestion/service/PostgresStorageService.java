@@ -47,7 +47,7 @@ public class PostgresStorageService {
   }
 
   @Transactional
-  public void saveDocument(SourceDocumentMetadata source, List<SemanticChunk> chunks) {
+  public String saveDocument(SourceDocumentMetadata source, List<SemanticChunk> chunks) {
     ensureProjectExists(source.projectId());
 
     String artifactId = saveArtifact(source);
@@ -63,6 +63,8 @@ public class PostgresStorageService {
         chunks.size(),
         source.bucketName(),
         source.objectName());
+
+    return artifactId;
   }
 
   private void ensureProjectExists(String projectId) {
@@ -147,11 +149,15 @@ public class PostgresStorageService {
             .charStart((long) chunk.getCharStart())
             .charEnd((long) chunk.getCharEnd())
             .chunkContentHash(chunk.getContentHash())
+            .domain(
+                chunk.getClassification() != null ? chunk.getClassification().getDomain() : null)
+            .subdomain(
+                chunk.getClassification() != null ? chunk.getClassification().getSubdomain() : null)
             .content(chunk.getContent())
-            .embedding(chunk.getEmbedding())
+            .embedding(embeddingToString(chunk.getEmbedding()))
             .build();
 
-    semanticChunkRepository.save(chunkEntity);
+    semanticChunkRepository.save(chunkEntity); // Custom VectorType handles the conversion
   }
 
   // ============================================================================
@@ -175,14 +181,20 @@ public class PostgresStorageService {
   }
 
   /** Ensures a subdomain exists under a domain and returns its UUID. */
-  public UUID ensureSubdomain(UUID domainId, String subdomainName) {
+  public UUID ensureSubdomain(
+      String projectId, String domainName, UUID domainId, String subdomainName) {
     return subdomainRepository
         .findByDomainIdAndSubdomain(domainId, subdomainName)
         .map(SubdomainEntity::getSubdomainId)
         .orElseGet(
             () -> {
               SubdomainEntity subdomain =
-                  SubdomainEntity.builder().domainId(domainId).subdomain(subdomainName).build();
+                  SubdomainEntity.builder()
+                      .projectId(projectId)
+                      .domain(domainName)
+                      .domainId(domainId)
+                      .subdomain(subdomainName)
+                      .build();
               return subdomainRepository.save(subdomain).getSubdomainId();
             });
   }
@@ -407,5 +419,16 @@ public class PostgresStorageService {
             .build();
 
     knowledgeRelationshipRepository.save(entity);
+  }
+
+  /**
+   * Converts a List<Double> embedding to a String format suitable for pgvector storage. Format:
+   * "[1.0, 2.0, 3.0, ...]"
+   */
+  private String embeddingToString(List<Double> embedding) {
+    if (embedding == null || embedding.isEmpty()) {
+      return null;
+    }
+    return embedding.toString();
   }
 }

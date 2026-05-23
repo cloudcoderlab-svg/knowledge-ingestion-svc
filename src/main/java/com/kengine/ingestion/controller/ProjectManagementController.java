@@ -37,62 +37,71 @@ public class ProjectManagementController {
   }
 
   /**
-   * Creates timestamped folders for a project in both staged and processed directories.
+   * Gets all files from today's daily dated folder in staged directory for processing.
    *
    * @param projectId Project identifier
-   * @return Success response with timestamp
+   * @return List of file paths from today's staged folder
    */
-  @PostMapping("/{projectId}/timestamped-folders")
-  public ResponseEntity<Map<String, String>> createTimestampedFolders(
+  @GetMapping("/{projectId}/today/staged-files")
+  public ResponseEntity<Map<String, Object>> getTodaysStagedFiles(@PathVariable String projectId) {
+    log.info("Getting today's staged files for processing: {}", projectId);
+    List<String> files = folderManagementService.getTodaysFilesForProcessing(projectId);
+    return ResponseEntity.ok(
+        Map.of("projectId", projectId, "stagedFiles", files, "count", files.size()));
+  }
+
+  /**
+   * Gets all files from today's daily dated folder in processed directory.
+   *
+   * @param projectId Project identifier
+   * @return List of file paths from today's processed folder
+   */
+  @GetMapping("/{projectId}/today/processed-files")
+  public ResponseEntity<Map<String, Object>> getTodaysProcessedFiles(
       @PathVariable String projectId) {
-    log.info("Creating timestamped folders for project: {}", projectId);
-    String timestamp = folderManagementService.createTimestampedFolders(projectId);
+    log.info("Getting today's processed files: {}", projectId);
+    List<String> files = folderManagementService.getTodaysProcessedFiles(projectId);
+    return ResponseEntity.ok(
+        Map.of("projectId", projectId, "processedFiles", files, "count", files.size()));
+  }
+
+  /**
+   * Creates daily dated folders (yyyy-MM-dd format) for a project in both staged and processed
+   * directories. Only creates if they don't already exist.
+   *
+   * @param projectId Project identifier
+   * @return Success response with date
+   */
+  @PostMapping("/{projectId}/daily-folders")
+  public ResponseEntity<Map<String, String>> createDailyDatedFolders(
+      @PathVariable String projectId) {
+    log.info("Creating daily dated folders for project: {}", projectId);
+    String dateFolder = folderManagementService.createDailyDatedFolders(projectId);
     return ResponseEntity.ok(
         Map.of(
             "message",
-            "Timestamped folders created successfully",
+            "Daily dated folders created successfully",
             "projectId",
             projectId,
-            "timestamp",
-            timestamp,
+            "date",
+            dateFolder,
             "stagedPath",
-            "staged/" + projectId + "/" + timestamp,
+            "staged/" + projectId + "/" + dateFolder,
             "processedPath",
-            "processed/" + projectId + "/" + timestamp));
+            "processed/" + projectId + "/" + dateFolder));
   }
 
   /**
-   * Lists all timestamped folders for a project.
+   * Checks if daily dated folders exist for today for a project.
    *
    * @param projectId Project identifier
-   * @return List of timestamp folder names
+   * @return Existence status
    */
-  @GetMapping("/{projectId}/timestamped-folders")
-  public ResponseEntity<Map<String, Object>> listTimestampedFolders(
+  @GetMapping("/{projectId}/daily-folders/exists")
+  public ResponseEntity<Map<String, Object>> checkDailyDatedFoldersExist(
       @PathVariable String projectId) {
-    log.info("Listing timestamped folders for project: {}", projectId);
-    List<String> folders = folderManagementService.listTimestampedFolders(projectId);
-    return ResponseEntity.ok(
-        Map.of("projectId", projectId, "folders", folders, "count", folders.size()));
-  }
-
-  /**
-   * Lists all files in a specific timestamped staged folder.
-   *
-   * @param projectId Project identifier
-   * @param timestamp Timestamp folder name
-   * @return List of file paths
-   */
-  @GetMapping("/{projectId}/timestamped-folders/{timestamp}/files")
-  public ResponseEntity<Map<String, Object>> listFilesInTimestampedFolder(
-      @PathVariable String projectId, @PathVariable String timestamp) {
-    log.info("Listing files in staged/{}/{}", projectId, timestamp);
-    List<String> files = folderManagementService.listFilesInStagedFolder(projectId, timestamp);
-    return ResponseEntity.ok(
-        Map.of(
-            "projectId", projectId,
-            "timestamp", timestamp,
-            "files", files,
-            "count", files.size()));
+    log.info("Checking if daily dated folders exist for project: {}", projectId);
+    boolean exists = folderManagementService.dailyDatedFoldersExist(projectId);
+    return ResponseEntity.ok(Map.of("projectId", projectId, "exists", exists));
   }
 }

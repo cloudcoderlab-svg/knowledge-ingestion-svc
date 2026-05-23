@@ -1,13 +1,14 @@
 package com.kengine.ingestion.entity;
 
+import com.kengine.ingestion.config.VectorType;
 import jakarta.persistence.*;
 import java.time.OffsetDateTime;
-import java.util.List;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.Type;
 
 @Entity
 @Table(name = "semantic_chunks")
@@ -69,8 +70,9 @@ public class SemanticChunkEntity {
   @Column(name = "content", columnDefinition = "text")
   private String content;
 
-  @Column(name = "embedding", columnDefinition = "vector(768)")
-  private List<Double> embedding;
+  @Column(name = "embedding")
+  @Type(VectorType.class)
+  private String embedding; // pgvector handled by custom UserType
 
   @Column(name = "created_at")
   @CreationTimestamp

@@ -34,11 +34,13 @@ public class KnowledgeGraphService {
    * Builds the knowledge graph from document-level and chunk-level knowledge. Extracts entities,
    * generates embeddings, and persists to database.
    *
+   * @param artifactId the UUID of the artifact in the database
    * @param source source document metadata
    * @param docKnowledge document-level knowledge
    * @param chunkKnowledge list of chunk-level knowledge extractions
    */
   public void buildKnowledgeGraph(
+      String artifactId,
       SourceDocumentMetadata source,
       DocumentKnowledge docKnowledge,
       List<KnowledgeExtractionResult> chunkKnowledge) {
@@ -61,37 +63,45 @@ public class KnowledgeGraphService {
         domainId = ensureDomain(source.projectId(), docKnowledge.getDomain());
 
         if (docKnowledge.getSubdomain() != null) {
-          subdomainId = ensureSubdomain(domainId, docKnowledge.getSubdomain());
+          subdomainId =
+              ensureSubdomain(
+                  source.projectId(),
+                  docKnowledge.getDomain(),
+                  domainId,
+                  docKnowledge.getSubdomain());
         }
       }
 
       // 2. Save document-level knowledge
       if (docKnowledge != null) {
-        saveDocumentKnowledge(source.objectName(), docKnowledge);
+        saveDocumentKnowledge(artifactId, docKnowledge);
       }
 
       // 3. Extract and save components from both document and chunks
       List<KnowledgeComponent> allComponents =
-          extractComponents(source, docKnowledge, chunkKnowledge, domainId, subdomainId);
+          extractComponents(
+              artifactId, source, docKnowledge, chunkKnowledge, domainId, subdomainId);
       Map<String, UUID> componentNameToId = saveComponents(allComponents);
 
       // 4. Extract and save business rules
       List<KnowledgeBusinessRule> allRules =
-          extractBusinessRules(source, chunkKnowledge, domainId, componentNameToId);
+          extractBusinessRules(artifactId, source, chunkKnowledge, domainId, componentNameToId);
       saveBusinessRules(allRules);
 
       // 5. Extract and save workflows
-      List<KnowledgeWorkflow> allWorkflows = extractWorkflows(source, chunkKnowledge, domainId);
+      List<KnowledgeWorkflow> allWorkflows =
+          extractWorkflows(artifactId, source, chunkKnowledge, domainId);
       saveWorkflows(allWorkflows);
 
       // 7. Extract and save resources
       List<KnowledgeResource> allResources =
-          extractResources(source, chunkKnowledge, componentNameToId);
+          extractResources(artifactId, source, chunkKnowledge, componentNameToId);
       saveResources(allResources);
 
       // 8. Extract and save relationships
-      List<KnowledgeRelationship> allRelationships = extractRelationships(source, chunkKnowledge);
-      saveRelationships(source, allRelationships);
+      List<KnowledgeRelationship> allRelationships =
+          extractRelationships(artifactId, source, chunkKnowledge);
+      saveRelationships(artifactId, source, allRelationships);
 
       log.info(
           "Knowledge graph built successfully for artifact: {}. "
@@ -122,9 +132,10 @@ public class KnowledgeGraphService {
   }
 
   /** Ensures a subdomain exists under a domain and returns its UUID. */
-  public UUID ensureSubdomain(UUID domainId, String subdomainName) {
+  public UUID ensureSubdomain(
+      String projectId, String domainName, UUID domainId, String subdomainName) {
     try {
-      return storageService.ensureSubdomain(domainId, subdomainName);
+      return storageService.ensureSubdomain(projectId, domainName, domainId, subdomainName);
     } catch (Exception e) {
       log.error("Failed to ensure subdomain: {}", subdomainName, e);
       throw new RuntimeException("Failed to ensure subdomain", e);
@@ -141,6 +152,7 @@ public class KnowledgeGraphService {
   }
 
   private List<KnowledgeComponent> extractComponents(
+      String artifactId,
       SourceDocumentMetadata source,
       DocumentKnowledge docKnowledge,
       List<KnowledgeExtractionResult> chunkKnowledge,
@@ -159,7 +171,7 @@ public class KnowledgeGraphService {
                 bc -> {
                   KnowledgeComponent component =
                       KnowledgeComponent.builder()
-                          .artifactId(source.objectName())
+                          .artifactId(artifactId)
                           .projectId(source.projectId())
                           .domainId(domainId)
                           .subdomainId(subdomainId)
@@ -186,7 +198,7 @@ public class KnowledgeGraphService {
                 tc -> {
                   KnowledgeComponent component =
                       KnowledgeComponent.builder()
-                          .artifactId(source.objectName())
+                          .artifactId(artifactId)
                           .projectId(source.projectId())
                           .domainId(domainId)
                           .subdomainId(subdomainId)
@@ -226,6 +238,7 @@ public class KnowledgeGraphService {
   }
 
   private List<KnowledgeBusinessRule> extractBusinessRules(
+      String artifactId,
       SourceDocumentMetadata source,
       List<KnowledgeExtractionResult> chunkKnowledge,
       UUID domainId,
@@ -243,7 +256,7 @@ public class KnowledgeGraphService {
 
                   KnowledgeBusinessRule rule =
                       KnowledgeBusinessRule.builder()
-                          .artifactId(source.objectName())
+                          .artifactId(artifactId)
                           .componentId(componentId)
                           .projectId(source.projectId())
                           .domainId(domainId)
@@ -276,6 +289,7 @@ public class KnowledgeGraphService {
   }
 
   private List<KnowledgeWorkflow> extractWorkflows(
+      String artifactId,
       SourceDocumentMetadata source,
       List<KnowledgeExtractionResult> chunkKnowledge,
       UUID domainId) {
@@ -310,7 +324,7 @@ public class KnowledgeGraphService {
 
                   KnowledgeWorkflow workflow =
                       KnowledgeWorkflow.builder()
-                          .artifactId(source.objectName())
+                          .artifactId(artifactId)
                           .projectId(source.projectId())
                           .domainId(domainId)
                           .workflowName(bf.getFlowName())
@@ -351,6 +365,7 @@ public class KnowledgeGraphService {
   }
 
   private List<KnowledgeResource> extractResources(
+      String artifactId,
       SourceDocumentMetadata source,
       List<KnowledgeExtractionResult> chunkKnowledge,
       Map<String, UUID> componentNameToId) {
@@ -365,7 +380,7 @@ public class KnowledgeGraphService {
                 dr -> {
                   KnowledgeResource resource =
                       KnowledgeResource.builder()
-                          .artifactId(source.objectName())
+                          .artifactId(artifactId)
                           .projectId(source.projectId())
                           .resourceName(dr.getResourceName())
                           .resourceType(dr.getResourceType())
@@ -410,7 +425,9 @@ public class KnowledgeGraphService {
   }
 
   private List<KnowledgeRelationship> extractRelationships(
-      SourceDocumentMetadata source, List<KnowledgeExtractionResult> chunkKnowledge) {
+      String artifactId,
+      SourceDocumentMetadata source,
+      List<KnowledgeExtractionResult> chunkKnowledge) {
 
     List<KnowledgeRelationship> relationships = new ArrayList<>();
 
@@ -424,11 +441,10 @@ public class KnowledgeGraphService {
   }
 
   private void saveRelationships(
-      SourceDocumentMetadata source, List<KnowledgeRelationship> relationships) {
+      String artifactId, SourceDocumentMetadata source, List<KnowledgeRelationship> relationships) {
     for (KnowledgeRelationship relationship : relationships) {
       try {
-        storageService.saveKnowledgeRelationship(
-            source.objectName(), source.projectId(), relationship);
+        storageService.saveKnowledgeRelationship(artifactId, source.projectId(), relationship);
       } catch (Exception e) {
         log.error(
             "Failed to save relationship: {} -> {}",
