@@ -35,8 +35,15 @@ cloudsql:
 
 gcp:
   project-id: app-lab-001
-  pubsub:
-    subscription-id: kengine-knowledge-topic-sub
+  storage:
+    bucket-name: kengine-knowledge-artifacts
+
+scheduler:
+  enabled: true
+  file-processing:
+    cron: "0 */5 * * * *"  # Every 5 minutes
+  folder-creation:
+    cron: "0 0 2 * * *"    # Daily at 2:00 AM
 
 vertex:
   project-id: ai-lab-001-494218

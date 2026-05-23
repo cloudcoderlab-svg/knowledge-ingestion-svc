@@ -40,7 +40,6 @@ dependencies {
     implementation 'org.postgresql:postgresql'
     implementation 'org.hibernate.orm:hibernate-community-dialects:6.4.4.Final'
     implementation 'com.google.cloud:google-cloud-storage:2.35.0'
-    implementation 'com.google.cloud:google-cloud-pubsub:1.127.1'
     implementation 'com.google.cloud:google-cloud-vertexai:1.20.0'
     implementation 'com.google.cloud:google-cloud-aiplatform:3.64.0'
 

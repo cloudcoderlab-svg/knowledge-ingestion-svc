@@ -20,7 +20,11 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 @SpringBootTest(
-    properties = {"gcp.project-id=test-project", "gcp.pubsub.subscription-id=test-subscription"})
+    properties = {
+      "gcp.project-id=test-project",
+      "gcp.storage.bucket-name=test-bucket",
+      "scheduler.enabled=false"
+    })
 @EnabledIfEnvironmentVariable(named = "RUN_REAL_GCP_INTEGRATION_TESTS", matches = "true")
 class KnowledgeIngestionRealGcpIntegrationTest {
 

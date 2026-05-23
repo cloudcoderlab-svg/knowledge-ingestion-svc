@@ -7,21 +7,29 @@ It ingests source artifacts from GCS, extracts document and chunk-level knowledg
 ## Current Architecture
 
 ```text
------------------------------+
-| GCS source artifacts        |
-| docs, XML, PDFs, images     |
++-----------------------------+
+| GCS Bucket:                 |
+| kengine-knowledge-artifacts |
+|                             |
+| staged/<project_id>/        |
+|   <timestamp>/              |
+|                             |
+| processed/<project_id>/     |
+|   <timestamp>/              |
 +-------------+---------------+
               |
-              v
+              v (Every 5 mins)
 +-------------+---------------+
-| Pub/Sub notification        |
-| kengine-knowledge-topic-sub |
+| Scheduler Service           |
+| Picks files from staged     |
+| folders and queues them     |
 +-------------+---------------+
               |
               v
 +-------------+---------------+
 | knowledge-ingestion-svc     |
 | Spring Boot + Jetty         |
+| ThreadPool Executor (10)    |
 +-------------+---------------+
               |
               v
@@ -51,12 +59,12 @@ It ingests source artifacts from GCS, extracts document and chunk-level knowledg
 Java 21
 Spring Boot 3.4.2
 Spring MVC + Jetty
+Spring Scheduler
 Spring Data JPA
 Liquibase
 Cloud SQL for PostgreSQL
 pgvector
 Google Cloud Storage
-Google Pub/Sub
 Vertex AI
 Apache Tika
 ```
@@ -151,23 +159,55 @@ These graph tables are included in the regenerated baseline SQL changelog.
 
 ## Ingestion Trigger
 
-The service subscribes to Google Pub/Sub using:
+The service uses a scheduler-based approach with the following configuration:
 
 ```text
 gcp.project-id=app-lab-001
-gcp.pubsub.subscription-id=kengine-knowledge-topic-sub
+gcp.storage.bucket-name=kengine-knowledge-artifacts
+scheduler.enabled=true
 ```
 
-Incoming Pub/Sub messages are expected to contain GCS event JSON with:
+### Folder Structure
 
-```json
-{
-  "bucket": "...",
-  "name": "project-id/path/to/source"
-}
-```
+The GCS bucket has two main folders:
+- `staged/<project_id>/<ISO_TIMESTAMP>/` - Files awaiting processing
+- `processed/<project_id>/<ISO_TIMESTAMP>/` - Successfully processed files
+
+### Default Project
+
+A default project folder is created on startup: `staged/default-project/`
+
+### Scheduler Behavior
+
+1. **Folder Creation Scheduler** (cron: `0 0 2 * * *` - daily at 2:00 AM):
+   - Queries all projects from `knowledge.projects` table
+   - Creates timestamped folders for each project: `staged/<project_id>/<ISO_TIMESTAMP>`
+   - Creates corresponding processed folders: `processed/<project_id>/<ISO_TIMESTAMP>`
+   - Falls back to "default-project" if no projects found
+
+2. **File Processing Scheduler** (cron: `0 */5 * * * *` - every 5 minutes):
+   - Lists all timestamped folders for each project
+   - For each folder, lists all files in staged folder
+   - Submits each file to processing queue (ThreadPool of 10 executors)
+   - After successful processing, moves file to corresponding processed folder
 
 The first path segment of the GCS object name becomes the project id. Root-level objects are rejected.
+
+### Project Management Endpoints
+
+```text
+POST /api/v1/projects/{projectId}/folders
+  Creates project-specific folder in staged directory
+
+POST /api/v1/projects/{projectId}/timestamped-folders
+  Creates timestamped folders for a project
+
+GET /api/v1/projects/{projectId}/timestamped-folders
+  Lists all timestamped folders for a project
+
+GET /api/v1/projects/{projectId}/timestamped-folders/{timestamp}/files
+  Lists files in a specific timestamped staged folder
+```
 
 ## Parsing Capabilities
 

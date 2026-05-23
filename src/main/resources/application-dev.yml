@@ -6,15 +6,18 @@ logging:
     liquibase: DEBUG
     org.springframework.boot.autoconfigure: DEBUG
     org.springframework.jdbc.datasource: DEBUG
+    com.kengine.ingestion: DEBUG
 
 spring:
   datasource:
     url: jdbc:postgresql://${KENGINE_DB_HOST:10.196.140.215}:${KENGINE_DB_PORT:5432}/${KENGINE_DB_NAME:kengine-db}
     username: ${KENGINE_DB_USER:kengine_app}
-    password: ${KENGINE_DB_PASSWORD:}
+    password: ${KENGINE_DB_PASSWORD:Admin@123}
   jpa:
+    show-sql: true
     properties:
       hibernate:
+        format_sql: true
         jdbc:
           batch_size: 20
   liquibase:
@@ -27,6 +30,15 @@ cloudsql:
 
 gcp:
   project-id: gpc-d-disc
+  storage:
+    bucket-name: ${GCS_BUCKET_NAME:kengine-knowledge-artifacts}
+
+scheduler:
+  enabled: ${SCHEDULER_ENABLED:true}
+  file-processing:
+    cron: ${FILE_PROCESSING_CRON:0 */5 * * * *}  # Every 5 minutes (default)
+  folder-creation:
+    cron: ${FOLDER_CREATION_CRON:0 0 2 * * *}    # Daily at 2:00 AM (default)
 
 vertex:
   project-id: gpc-d-disc
