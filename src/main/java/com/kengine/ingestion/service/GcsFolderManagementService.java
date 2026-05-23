@@ -32,13 +32,17 @@ public class GcsFolderManagementService {
       DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH-mm-ss").withZone(ZoneOffset.UTC);
 
   /**
-   * Creates project-specific folders in the staged directory. Creates a marker file to ensure
-   * folder exists in GCS.
+   * Creates project-specific folders in both staged and processed directories. Creates marker files
+   * to ensure folders exist in GCS.
    */
   public void createProjectFolder(String projectId) {
-    String folderPath = STAGED_PREFIX + projectId + "/.folder";
-    createMarkerFile(folderPath);
-    log.info("Created project folder for project: {}", projectId);
+    String stagedFolderPath = STAGED_PREFIX + projectId + "/.folder";
+    String processedFolderPath = PROCESSED_PREFIX + projectId + "/.folder";
+
+    createMarkerFile(stagedFolderPath);
+    createMarkerFile(processedFolderPath);
+
+    log.info("Created project folders (staged and processed) for project: {}", projectId);
   }
 
   /**
