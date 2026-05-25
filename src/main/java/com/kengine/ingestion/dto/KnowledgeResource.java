@@ -11,9 +11,9 @@ import lombok.Data;
 @Builder
 public class KnowledgeResource {
   private UUID resourceId;
-  private String artifactId;
+  private UUID artifactId;
   private UUID componentId;
-  private String projectId;
+  private UUID subjectId;
   private String resourceName;
   private String resourceType;
   private String provider;

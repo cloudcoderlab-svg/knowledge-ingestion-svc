@@ -12,8 +12,8 @@ import lombok.Data;
 public class KnowledgeAPI {
   private UUID apiId;
   private UUID componentId;
-  private String artifactId;
-  private String projectId;
+  private UUID artifactId;
+  private UUID subjectId;
   private String apiName;
   private String apiType;
   private String httpMethod;

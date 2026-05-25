@@ -23,11 +23,14 @@ public class DomainEntity {
   @Column(name = "domain_id", nullable = false)
   private UUID domainId;
 
-  @Column(name = "project_id", nullable = false)
-  private String projectId;
+  @Column(name = "subject_id", nullable = false)
+  private UUID subjectId;
 
-  @Column(name = "domain", nullable = false)
+  @Column(name = "domain", nullable = false, length = 500)
   private String domain;
+
+  @Column(name = "description", columnDefinition = "text")
+  private String description;
 
   @Column(name = "created_at")
   @CreationTimestamp

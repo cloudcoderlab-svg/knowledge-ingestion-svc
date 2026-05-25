@@ -10,9 +10,9 @@ import lombok.Data;
 @Builder
 public class KnowledgeIntegration {
   private UUID integrationId;
-  private String artifactId;
+  private UUID artifactId;
   private UUID componentId;
-  private String projectId;
+  private UUID subjectId;
   private String integrationName;
   private String integrationType;
   private String sourceSystem;

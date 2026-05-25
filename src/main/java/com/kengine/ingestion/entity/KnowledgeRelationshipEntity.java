@@ -1,14 +1,15 @@
 package com.kengine.ingestion.entity;
 
+import com.kengine.ingestion.config.VectorType;
 import jakarta.persistence.*;
 import java.time.OffsetDateTime;
-import java.util.List;
 import java.util.UUID;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.Type;
 
 @Entity
 @Table(name = "knowledge_relationships")
@@ -22,8 +23,8 @@ public class KnowledgeRelationshipEntity {
   @Column(name = "relationship_id", length = 36, nullable = false)
   private String relationshipId;
 
-  @Column(name = "project_id", nullable = false)
-  private String projectId;
+  @Column(name = "subject_id", nullable = false)
+  private UUID subjectId;
 
   @Column(name = "source_name", nullable = false)
   private String sourceName;
@@ -49,18 +50,19 @@ public class KnowledgeRelationshipEntity {
   @Column(name = "context", columnDefinition = "text")
   private String context;
 
-  @Column(name = "source_artifact_id", length = 36)
-  private String sourceArtifactId;
+  @Column(name = "source_artifact_id")
+  private UUID sourceArtifactId;
 
-  @Column(name = "source_chunk_id", length = 36)
-  private String sourceChunkId;
+  @Column(name = "source_chunk_id")
+  private UUID sourceChunkId;
 
   @Column(name = "confidence")
   private Double confidence;
 
   // New fields from 005-redesign-phase1-schema
-  @Column(name = "embedding", columnDefinition = "vector(768)")
-  private List<Double> embedding;
+  @Column(name = "embedding")
+  @Type(VectorType.class)
+  private String embedding; // pgvector handled by custom UserType
 
   @Column(name = "source_entity_type", length = 100)
   private String sourceEntityType;

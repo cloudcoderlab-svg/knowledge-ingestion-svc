@@ -54,6 +54,25 @@ public class DocumentChunker {
     return chunks;
   }
 
+  /**
+   * Chunks content with subject context prepended for enhanced semantic understanding.
+   *
+   * @param content The document content to chunk
+   * @param subjectContext The subject context from definition.md
+   * @return List of semantic chunks with context
+   */
+  public List<SemanticChunk> chunk(String content, String subjectContext) {
+    if (subjectContext == null || subjectContext.isEmpty()) {
+      return chunk(content);
+    }
+
+    // Prepend subject context to document content
+    String contextualContent =
+        "=== SUBJECT CONTEXT ===\n" + subjectContext + "\n\n=== DOCUMENT CONTENT ===\n" + content;
+
+    return chunk(contextualContent);
+  }
+
   public String contentHash(String content) {
     return sha256(content.strip());
   }

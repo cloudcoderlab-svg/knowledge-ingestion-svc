@@ -38,7 +38,7 @@ public class BusinessRuleController {
   private BusinessRuleDto toDto(Object[] row) {
     return BusinessRuleDto.builder()
         .ruleId((UUID) row[0])
-        .artifactId((String) row[1])
+        .artifactId(row[1] != null ? row[1].toString() : null)
         .ruleName((String) row[5])
         .ruleType((String) row[6])
         .conditionText((String) row[7])

@@ -5,9 +5,10 @@
     xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
     http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.20.xsd">
 
-    <changeSet id="baseline-001-knowledge-schema" author="system">
+    <!-- Consolidated complete schema with all tables, knowledge graph, and entity alignments -->
+    <changeSet id="001-complete-schema" author="kengine">
         <sqlFile
-            path="db/changelog/sql/baseline-001-knowledge-schema.sql"
+            path="db/changelog/sql/001-initial-schema.sql"
             relativeToChangelogFile="false"
             splitStatements="true"
             stripComments="false"/>

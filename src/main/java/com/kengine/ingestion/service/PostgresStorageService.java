@@ -4,7 +4,6 @@ import com.kengine.ingestion.dto.*;
 import com.kengine.ingestion.entity.*;
 import com.kengine.ingestion.repository.*;
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -16,7 +15,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Slf4j
 public class PostgresStorageService {
 
-  private final ProjectRepository projectRepository;
+  private final SubjectRepository subjectRepository;
   private final ArtifactRepository artifactRepository;
   private final IngestionDocumentRepository ingestionDocumentRepository;
   private final SemanticChunkRepository semanticChunkRepository;
@@ -34,10 +33,29 @@ public class PostgresStorageService {
   private final KnowledgeResourceRepository knowledgeResourceRepository;
   private final KnowledgeRelationshipRepository knowledgeRelationshipRepository;
 
+  /**
+   * Converts a List<Double> embedding to pgvector string format: "[0.1, 0.2, 0.3]".
+   *
+   * @param embedding the embedding as a list of doubles
+   * @return the pgvector-formatted string, or null if embedding is null
+   */
+  private String embeddingToString(List<Double> embedding) {
+    if (embedding == null || embedding.isEmpty()) {
+      return null;
+    }
+    StringBuilder sb = new StringBuilder("[");
+    for (int i = 0; i < embedding.size(); i++) {
+      if (i > 0) sb.append(",");
+      sb.append(embedding.get(i));
+    }
+    sb.append("]");
+    return sb.toString();
+  }
+
   public ClassificationResult findExistingClassification(SourceDocumentMetadata source) {
     boolean exists =
-        ingestionDocumentRepository.existsByProjectIdAndSourceBucketAndSourceObjectAndContentHash(
-            source.projectId(), source.bucketName(), source.objectName(), source.contentHash());
+        ingestionDocumentRepository.existsBySubjectIdAndSourceBucketAndSourceObjectAndContentHash(
+            source.subjectId(), source.bucketName(), source.objectName(), source.contentHash());
 
     if (exists) {
       log.info("Found existing document for hash: {}", source.contentHash());
@@ -47,11 +65,9 @@ public class PostgresStorageService {
   }
 
   @Transactional
-  public String saveDocument(SourceDocumentMetadata source, List<SemanticChunk> chunks) {
-    ensureProjectExists(source.projectId());
-
-    String artifactId = saveArtifact(source);
-    String documentId = saveIngestionDocument(source, artifactId, chunks.size());
+  public UUID saveDocument(SourceDocumentMetadata source, List<SemanticChunk> chunks) {
+    UUID artifactId = saveArtifact(source);
+    UUID documentId = saveIngestionDocument(source, artifactId, chunks.size());
 
     for (int i = 0; i < chunks.size(); i++) {
       SemanticChunk chunk = chunks.get(i);
@@ -67,33 +83,17 @@ public class PostgresStorageService {
     return artifactId;
   }
 
-  private void ensureProjectExists(String projectId) {
-    projectRepository
-        .findByProjectId(projectId)
-        .orElseGet(
-            () -> {
-              ProjectEntity project =
-                  ProjectEntity.builder()
-                      .projectId(projectId)
-                      .projectName(projectId)
-                      .sourceBucket("default-bucket")
-                      .gcsPrefix(projectId + "/")
-                      .build();
-              return projectRepository.save(project);
-            });
-  }
-
-  private String saveArtifact(SourceDocumentMetadata source) {
+  private UUID saveArtifact(SourceDocumentMetadata source) {
     return artifactRepository
-        .findByProjectIdAndSourceBucketAndSourceObjectAndContentHash(
-            source.projectId(), source.bucketName(), source.objectName(), source.contentHash())
+        .findBySubjectIdAndSourceBucketAndSourceObjectAndContentHash(
+            source.subjectId(), source.bucketName(), source.objectName(), source.contentHash())
         .map(ArtifactEntity::getArtifactId)
         .orElseGet(
             () -> {
               ArtifactEntity artifact =
                   ArtifactEntity.builder()
-                      .artifactId(UUID.randomUUID().toString())
-                      .projectId(source.projectId())
+                      .artifactId(UUID.randomUUID())
+                      .subjectId(source.subjectId())
                       .sourceBucket(source.bucketName())
                       .sourceObject(source.objectName())
                       .sourceGeneration(source.generation())
@@ -108,19 +108,19 @@ public class PostgresStorageService {
             });
   }
 
-  private String saveIngestionDocument(
-      SourceDocumentMetadata source, String artifactId, int chunkCount) {
+  private UUID saveIngestionDocument(
+      SourceDocumentMetadata source, UUID artifactId, int chunkCount) {
     IngestionDocumentEntity document =
         IngestionDocumentEntity.builder()
-            .documentId(UUID.randomUUID().toString())
+            .documentId(UUID.randomUUID())
             .artifactId(artifactId)
-            .projectId(source.projectId())
+            .subjectId(source.subjectId())
             .sourceBucket(source.bucketName())
             .sourceObject(source.objectName())
             .sourceGeneration(source.generation())
             .sourceChecksum(source.checksum())
             .contentHash(source.contentHash())
-            .chunkCount((long) chunkCount)
+            .chunkCount(chunkCount)
             .build();
 
     return ingestionDocumentRepository.save(document).getDocumentId();
@@ -129,22 +129,22 @@ public class PostgresStorageService {
   private void saveSemanticChunk(
       SourceDocumentMetadata source,
       SemanticChunk chunk,
-      String artifactId,
-      String documentId,
+      UUID artifactId,
+      UUID documentId,
       int index,
       int total) {
     SemanticChunkEntity chunkEntity =
         SemanticChunkEntity.builder()
-            .chunkId(UUID.randomUUID().toString())
+            .chunkId(UUID.randomUUID())
             .documentId(documentId)
             .artifactId(artifactId)
-            .projectId(source.projectId())
+            .subjectId(source.subjectId())
             .sourceBucket(source.bucketName())
             .sourceObject(source.objectName())
             .sourceGeneration(source.generation())
             .sourceChecksum(source.checksum())
             .documentContentHash(source.contentHash())
-            .chunkIndex((long) index)
+            .chunkIndex(index)
             .totalChunks((long) total)
             .charStart((long) chunk.getCharStart())
             .charEnd((long) chunk.getCharEnd())
@@ -168,21 +168,21 @@ public class PostgresStorageService {
    * Ensures a domain exists and returns its UUID. Creates if doesn't exist, returns existing UUID
    * if it does.
    */
-  public UUID ensureDomain(String projectId, String domainName) {
+  public UUID ensureDomain(UUID subjectId, String domainName) {
     return domainRepository
-        .findByProjectIdAndDomain(projectId, domainName)
+        .findBySubjectIdAndDomain(subjectId, domainName)
         .map(DomainEntity::getDomainId)
         .orElseGet(
             () -> {
               DomainEntity domain =
-                  DomainEntity.builder().projectId(projectId).domain(domainName).build();
+                  DomainEntity.builder().subjectId(subjectId).domain(domainName).build();
               return domainRepository.save(domain).getDomainId();
             });
   }
 
   /** Ensures a subdomain exists under a domain and returns its UUID. */
   public UUID ensureSubdomain(
-      String projectId, String domainName, UUID domainId, String subdomainName) {
+      UUID subjectId, String domainName, UUID domainId, String subdomainName) {
     return subdomainRepository
         .findByDomainIdAndSubdomain(domainId, subdomainName)
         .map(SubdomainEntity::getSubdomainId)
@@ -190,8 +190,7 @@ public class PostgresStorageService {
             () -> {
               SubdomainEntity subdomain =
                   SubdomainEntity.builder()
-                      .projectId(projectId)
-                      .domain(domainName)
+                      .subjectId(subjectId)
                       .domainId(domainId)
                       .subdomain(subdomainName)
                       .build();
@@ -200,24 +199,30 @@ public class PostgresStorageService {
   }
 
   /** Saves document-level knowledge analysis results. */
-  public void saveDocumentKnowledge(String artifactId, DocumentKnowledge docKnowledge) {
-    // Convert List<String> to Map<String, Object> for JSONB storage
-    Map<String, Object> keyPatternsMap =
+  public void saveDocumentKnowledge(
+      UUID artifactId, UUID subjectId, DocumentKnowledge docKnowledge) {
+    // Convert List<String> to String[] for PostgreSQL array storage
+    String[] keyConceptsArray =
         docKnowledge.getKeyPatterns() != null
-            ? Map.of("patterns", docKnowledge.getKeyPatterns())
+            ? docKnowledge.getKeyPatterns().toArray(new String[0])
             : null;
-    Map<String, Object> technologiesMap =
+    String[] technologiesArray =
         docKnowledge.getTechnologies() != null
-            ? Map.of("technologies", docKnowledge.getTechnologies())
+            ? docKnowledge.getTechnologies().toArray(new String[0])
             : null;
 
     DocumentKnowledgeEntity entity =
         DocumentKnowledgeEntity.builder()
             .artifactId(artifactId)
-            .overallArchitecture(docKnowledge.getOverallArchitecture())
-            .systemSummary(docKnowledge.getSystemSummary())
-            .keyPatterns(keyPatternsMap)
-            .technologies(technologiesMap)
+            .subjectId(subjectId)
+            .title(docKnowledge.getSystemSummary())
+            .summary(docKnowledge.getOverallArchitecture())
+            .domain(docKnowledge.getDomain())
+            .subdomain(docKnowledge.getSubdomain())
+            .documentType(docKnowledge.getDetectedPlatform())
+            .keyConcepts(keyConceptsArray)
+            .technologies(technologiesArray)
+            .extractedAt(java.time.OffsetDateTime.now())
             .build();
 
     documentKnowledgeRepository.save(entity);
@@ -228,7 +233,7 @@ public class PostgresStorageService {
     KnowledgeComponentEntity entity =
         KnowledgeComponentEntity.builder()
             .artifactId(component.getArtifactId())
-            .projectId(component.getProjectId())
+            .subjectId(component.getSubjectId())
             .domainId(component.getDomainId())
             .subdomainId(component.getSubdomainId())
             .componentName(component.getComponentName())
@@ -241,7 +246,7 @@ public class PostgresStorageService {
             .owner(component.getOwner())
             .lifecycle(component.getLifecycle())
             .confidence(component.getConfidence())
-            .embedding(component.getEmbedding())
+            .embedding(embeddingToString(component.getEmbedding()))
             .metadata(component.getMetadata())
             .build();
 
@@ -254,7 +259,7 @@ public class PostgresStorageService {
         KnowledgeAPIEntity.builder()
             .componentId(api.getComponentId())
             .artifactId(api.getArtifactId())
-            .projectId(api.getProjectId())
+            .subjectId(api.getSubjectId())
             .apiName(api.getApiName())
             .apiType(api.getApiType())
             .httpMethod(api.getHttpMethod())
@@ -263,7 +268,7 @@ public class PostgresStorageService {
             .requestSchema(api.getRequestSchema())
             .responseSchema(api.getResponseSchema())
             .authentication(api.getAuthentication())
-            .embedding(api.getEmbedding())
+            .embedding(embeddingToString(api.getEmbedding()))
             .build();
 
     return knowledgeAPIRepository.save(entity).getApiId();
@@ -275,7 +280,7 @@ public class PostgresStorageService {
         KnowledgeBusinessRuleEntity.builder()
             .artifactId(rule.getArtifactId())
             .componentId(rule.getComponentId())
-            .projectId(rule.getProjectId())
+            .subjectId(rule.getSubjectId())
             .domainId(rule.getDomainId())
             .ruleName(rule.getRuleName())
             .ruleType(rule.getRuleType())
@@ -283,7 +288,7 @@ public class PostgresStorageService {
             .outcomeText(rule.getOutcomeText())
             .priority(rule.getPriority())
             .confidence(rule.getConfidence())
-            .embedding(rule.getEmbedding())
+            .embedding(embeddingToString(rule.getEmbedding()))
             .build();
 
     return knowledgeBusinessRuleRepository.save(entity).getRuleId();
@@ -294,14 +299,14 @@ public class PostgresStorageService {
     KnowledgeWorkflowEntity entity =
         KnowledgeWorkflowEntity.builder()
             .artifactId(workflow.getArtifactId())
-            .projectId(workflow.getProjectId())
+            .subjectId(workflow.getSubjectId())
             .domainId(workflow.getDomainId())
             .workflowName(workflow.getWorkflowName())
             .triggerText(workflow.getTriggerText())
             .outcomeText(workflow.getOutcomeText())
             .owner(workflow.getOwner())
             .confidence(workflow.getConfidence())
-            .embedding(workflow.getEmbedding())
+            .embedding(embeddingToString(workflow.getEmbedding()))
             .build();
 
     return knowledgeWorkflowRepository.save(entity).getWorkflowId();
@@ -319,7 +324,7 @@ public class PostgresStorageService {
             .inputData(step.getInputData())
             .outputData(step.getOutputData())
             .nextStep(step.getNextStep())
-            .embedding(step.getEmbedding())
+            .embedding(embeddingToString(step.getEmbedding()))
             .build();
 
     return knowledgeWorkflowStepRepository.save(entity).getStepId();
@@ -330,13 +335,13 @@ public class PostgresStorageService {
     KnowledgeDataModelEntity entity =
         KnowledgeDataModelEntity.builder()
             .artifactId(dataModel.getArtifactId())
-            .projectId(dataModel.getProjectId())
+            .subjectId(dataModel.getSubjectId())
             .domainId(dataModel.getDomainId())
             .modelName(dataModel.getModelName())
             .modelType(dataModel.getModelType())
             .description(dataModel.getDescription())
             .schemaDefinition(dataModel.getSchemaDefinition())
-            .embedding(dataModel.getEmbedding())
+            .embedding(embeddingToString(dataModel.getEmbedding()))
             .build();
 
     return knowledgeDataModelRepository.save(entity).getDataModelId();
@@ -363,14 +368,14 @@ public class PostgresStorageService {
         KnowledgeIntegrationEntity.builder()
             .artifactId(integration.getArtifactId())
             .componentId(integration.getComponentId())
-            .projectId(integration.getProjectId())
+            .subjectId(integration.getSubjectId())
             .integrationName(integration.getIntegrationName())
             .integrationType(integration.getIntegrationType())
             .sourceSystem(integration.getSourceSystem())
             .targetSystem(integration.getTargetSystem())
             .protocol(integration.getProtocol())
             .description(integration.getDescription())
-            .embedding(integration.getEmbedding())
+            .embedding(embeddingToString(integration.getEmbedding()))
             .build();
 
     return knowledgeIntegrationRepository.save(entity).getIntegrationId();
@@ -382,7 +387,7 @@ public class PostgresStorageService {
         KnowledgeResourceEntity.builder()
             .artifactId(resource.getArtifactId())
             .componentId(resource.getComponentId())
-            .projectId(resource.getProjectId())
+            .subjectId(resource.getSubjectId())
             .resourceName(resource.getResourceName())
             .resourceType(resource.getResourceType())
             .provider(resource.getProvider())
@@ -393,7 +398,7 @@ public class PostgresStorageService {
             .lifecycle(resource.getLifecycle())
             .configs(resource.getConfigs())
             .confidence(resource.getConfidence())
-            .embedding(resource.getEmbedding())
+            .embedding(embeddingToString(resource.getEmbedding()))
             .build();
 
     return knowledgeResourceRepository.save(entity).getResourceId();
@@ -401,11 +406,11 @@ public class PostgresStorageService {
 
   /** Saves a knowledge relationship. */
   public void saveKnowledgeRelationship(
-      String artifactId, String projectId, KnowledgeRelationship relationship) {
+      UUID artifactId, UUID subjectId, KnowledgeRelationship relationship) {
     KnowledgeRelationshipEntity entity =
         KnowledgeRelationshipEntity.builder()
             .relationshipId(UUID.randomUUID().toString())
-            .projectId(projectId)
+            .subjectId(subjectId)
             .sourceName(relationship.getSourceName())
             .sourceType(relationship.getSourceType())
             .sourceRefId(null) // Not available in DTO
@@ -419,16 +424,5 @@ public class PostgresStorageService {
             .build();
 
     knowledgeRelationshipRepository.save(entity);
-  }
-
-  /**
-   * Converts a List<Double> embedding to a String format suitable for pgvector storage. Format:
-   * "[1.0, 2.0, 3.0, ...]"
-   */
-  private String embeddingToString(List<Double> embedding) {
-    if (embedding == null || embedding.isEmpty()) {
-      return null;
-    }
-    return embedding.toString();
   }
 }

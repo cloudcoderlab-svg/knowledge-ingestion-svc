@@ -1,7 +1,9 @@
 package com.kengine.ingestion.dto;
 
+import java.util.UUID;
+
 public record SourceDocumentMetadata(
-    String projectId,
+    UUID subjectId,
     String bucketName,
     String objectName,
     Long generation,

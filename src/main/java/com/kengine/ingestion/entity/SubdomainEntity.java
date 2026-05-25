@@ -23,17 +23,17 @@ public class SubdomainEntity {
   @Column(name = "subdomain_id", nullable = false)
   private UUID subdomainId;
 
-  @Column(name = "domain_id")
+  @Column(name = "subject_id", nullable = false)
+  private UUID subjectId;
+
+  @Column(name = "domain_id", nullable = false)
   private UUID domainId;
 
-  @Column(name = "project_id", nullable = false)
-  private String projectId;
-
-  @Column(name = "domain", nullable = false)
-  private String domain;
-
-  @Column(name = "subdomain", nullable = false)
+  @Column(name = "subdomain", nullable = false, length = 500)
   private String subdomain;
+
+  @Column(name = "description", columnDefinition = "text")
+  private String description;
 
   @Column(name = "created_at")
   @CreationTimestamp

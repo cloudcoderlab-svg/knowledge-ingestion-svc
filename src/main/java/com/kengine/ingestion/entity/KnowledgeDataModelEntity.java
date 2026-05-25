@@ -1,8 +1,8 @@
 package com.kengine.ingestion.entity;
 
+import com.kengine.ingestion.config.VectorType;
 import jakarta.persistence.*;
 import java.time.OffsetDateTime;
-import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import lombok.AllArgsConstructor;
@@ -11,6 +11,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.annotations.Type;
 import org.hibernate.type.SqlTypes;
 
 @Entity
@@ -26,11 +27,14 @@ public class KnowledgeDataModelEntity {
   @Column(name = "data_model_id", nullable = false)
   private UUID dataModelId;
 
-  @Column(name = "artifact_id", length = 36)
-  private String artifactId;
+  @Column(name = "artifact_id")
+  private UUID artifactId;
 
-  @Column(name = "project_id", nullable = false)
-  private String projectId;
+  @Column(name = "component_id")
+  private UUID componentId;
+
+  @Column(name = "subject_id", nullable = false)
+  private UUID subjectId;
 
   @Column(name = "domain_id")
   private UUID domainId;
@@ -44,12 +48,22 @@ public class KnowledgeDataModelEntity {
   @Column(name = "description", columnDefinition = "text")
   private String description;
 
+  @Column(name = "database_type", length = 100)
+  private String databaseType;
+
+  @Column(name = "schema_name", length = 255)
+  private String schemaName;
+
+  @Column(name = "confidence")
+  private Double confidence;
+
   @JdbcTypeCode(SqlTypes.JSON)
   @Column(name = "schema_definition", columnDefinition = "jsonb")
   private Map<String, Object> schemaDefinition;
 
-  @Column(name = "embedding", columnDefinition = "vector(768)")
-  private List<Double> embedding;
+  @Column(name = "embedding")
+  @Type(VectorType.class)
+  private String embedding; // pgvector handled by custom UserType
 
   @Column(name = "business_name", length = 500)
   private String businessName;

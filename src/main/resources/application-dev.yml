@@ -24,6 +24,7 @@ spring:
   liquibase:
     enabled: true
     change-log: classpath:/db/changelog/db.changelog-master.xml
+    drop-first: false
 
 cloudsql:
   instance-id: gpc-d-disc-postgresdb
@@ -33,13 +34,6 @@ gcp:
   project-id: gpc-d-disc
   storage:
     bucket-name: ${GCS_BUCKET_NAME:kengine-knowledge-artifacts}
-
-scheduler:
-  enabled: ${SCHEDULER_ENABLED:true}
-  file-processing:
-    cron: ${FILE_PROCESSING_CRON:0 */5 * * * *}  # Every 5 minutes (default)
-  folder-creation:
-    cron: ${FOLDER_CREATION_CRON:0 0 2 * * *}    # Daily at 2:00 AM (default)
 
 vertex:
   project-id: gpc-d-disc

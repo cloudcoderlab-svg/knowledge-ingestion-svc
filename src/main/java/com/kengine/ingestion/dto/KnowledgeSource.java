@@ -1,8 +1,10 @@
 package com.kengine.ingestion.dto;
 
+import java.util.UUID;
+
 public record KnowledgeSource(
-    String artifactId,
-    String projectId,
+    UUID artifactId,
+    UUID subjectId,
     String domain,
     String subdomain,
     String sourceBucket,
@@ -13,5 +15,5 @@ public record KnowledgeSource(
     String artifactType,
     String fileType,
     String title,
-    String version,
+    Integer version,
     Boolean current) {}

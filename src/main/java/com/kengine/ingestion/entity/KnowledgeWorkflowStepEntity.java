@@ -1,14 +1,15 @@
 package com.kengine.ingestion.entity;
 
+import com.kengine.ingestion.config.VectorType;
 import jakarta.persistence.*;
 import java.time.OffsetDateTime;
-import java.util.List;
 import java.util.UUID;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.Type;
 
 @Entity
 @Table(name = "knowledge_workflow_steps")
@@ -47,8 +48,9 @@ public class KnowledgeWorkflowStepEntity {
   @Column(name = "next_step", length = 500)
   private String nextStep;
 
-  @Column(name = "embedding", columnDefinition = "vector(768)")
-  private List<Double> embedding;
+  @Column(name = "embedding")
+  @Type(VectorType.class)
+  private String embedding; // pgvector handled by custom UserType
 
   @Column(name = "created_at")
   @CreationTimestamp

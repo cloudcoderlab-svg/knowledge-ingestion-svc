@@ -1,8 +1,8 @@
 package com.kengine.ingestion.entity;
 
+import com.kengine.ingestion.config.VectorType;
 import jakarta.persistence.*;
 import java.time.OffsetDateTime;
-import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import lombok.AllArgsConstructor;
@@ -11,6 +11,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.annotations.Type;
 import org.hibernate.annotations.UpdateTimestamp;
 import org.hibernate.type.SqlTypes;
 
@@ -27,11 +28,11 @@ public class KnowledgeComponentEntity {
   @Column(name = "component_id", nullable = false)
   private UUID componentId;
 
-  @Column(name = "artifact_id", length = 36)
-  private String artifactId;
+  @Column(name = "artifact_id")
+  private UUID artifactId;
 
-  @Column(name = "project_id", nullable = false)
-  private String projectId;
+  @Column(name = "subject_id", nullable = false)
+  private UUID subjectId;
 
   @Column(name = "domain_id")
   private UUID domainId;
@@ -69,8 +70,9 @@ public class KnowledgeComponentEntity {
   @Column(name = "confidence")
   private Double confidence;
 
-  @Column(name = "embedding", columnDefinition = "vector(768)")
-  private List<Double> embedding;
+  @Column(name = "embedding")
+  @Type(VectorType.class)
+  private String embedding; // pgvector handled by custom UserType
 
   @JdbcTypeCode(SqlTypes.JSON)
   @Column(name = "metadata", columnDefinition = "jsonb")

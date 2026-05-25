@@ -6,4 +6,8 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
 @Repository
-public interface KnowledgeResourceRepository extends JpaRepository<KnowledgeResourceEntity, UUID> {}
+public interface KnowledgeResourceRepository extends JpaRepository<KnowledgeResourceEntity, UUID> {
+  int deleteBySubjectId(UUID subjectId);
+
+  long countBySubjectId(UUID subjectId);
+}

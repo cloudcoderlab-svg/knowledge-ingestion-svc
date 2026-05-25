@@ -2,16 +2,12 @@ package com.kengine.ingestion.entity;
 
 import jakarta.persistence.*;
 import java.time.OffsetDateTime;
-import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.hibernate.annotations.CreationTimestamp;
-import org.hibernate.annotations.JdbcTypeCode;
-import org.hibernate.type.SqlTypes;
 
 @Entity
 @Table(name = "document_knowledge")
@@ -26,25 +22,38 @@ public class DocumentKnowledgeEntity {
   @Column(name = "doc_knowledge_id", nullable = false)
   private UUID docKnowledgeId;
 
-  @Column(name = "artifact_id", length = 36, nullable = false)
-  private String artifactId;
+  @Column(name = "artifact_id", nullable = false)
+  private UUID artifactId;
 
-  @Column(name = "overall_architecture", columnDefinition = "text")
-  private String overallArchitecture;
+  @Column(name = "subject_id", nullable = false)
+  private UUID subjectId;
 
-  @Column(name = "system_summary", columnDefinition = "text")
-  private String systemSummary;
+  @Column(name = "title", length = 1000)
+  private String title;
 
-  @JdbcTypeCode(SqlTypes.JSON)
-  @Column(name = "key_patterns", columnDefinition = "jsonb")
-  private Map<String, Object> keyPatterns;
+  @Column(name = "summary", columnDefinition = "text")
+  private String summary;
 
-  @JdbcTypeCode(SqlTypes.JSON)
-  @Column(name = "technologies", columnDefinition = "jsonb")
-  private Map<String, Object> technologies;
+  @Column(name = "domain", length = 500)
+  private String domain;
 
-  @Column(name = "embedding", columnDefinition = "vector(768)")
-  private List<Double> embedding;
+  @Column(name = "subdomain", length = 500)
+  private String subdomain;
+
+  @Column(name = "document_type", length = 100)
+  private String documentType;
+
+  @Column(name = "key_entities", columnDefinition = "text[]")
+  private String[] keyEntities;
+
+  @Column(name = "key_concepts", columnDefinition = "text[]")
+  private String[] keyConcepts;
+
+  @Column(name = "technologies", columnDefinition = "text[]")
+  private String[] technologies;
+
+  @Column(name = "extracted_at")
+  private OffsetDateTime extractedAt;
 
   @Column(name = "created_at")
   @CreationTimestamp

@@ -10,8 +10,8 @@ import lombok.Data;
 @Builder
 public class KnowledgeWorkflow {
   private UUID workflowId;
-  private String artifactId;
-  private String projectId;
+  private UUID artifactId;
+  private UUID subjectId;
   private UUID domainId;
   private String workflowName;
   private String triggerText;

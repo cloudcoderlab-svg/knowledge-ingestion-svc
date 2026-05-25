@@ -6,10 +6,12 @@ import com.google.cloud.storage.BlobId;
 import com.google.cloud.storage.Storage;
 import com.kengine.ingestion.dto.*;
 import com.kengine.ingestion.parser.DocumentParserOrchestrator;
+import com.kengine.ingestion.repository.SubjectRepository;
 import java.io.InputStream;
 import java.nio.channels.Channels;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -35,11 +37,13 @@ public class KnowledgeIngestionService {
   private final PostgresStorageService storageService;
   private final DocumentChunker documentChunker;
   private final Storage storage;
+  private final GcsFolderManagementService gcsFolderManagementService;
+  private final SubjectRepository subjectRepository;
 
   public ClassificationResult ingestFromGcs(String bucketName, String objectName) throws Exception {
     log.info("Ingesting file from GCS: gs://{}/{}", bucketName, objectName);
 
-    String projectId = projectIdFromObjectName(objectName);
+    UUID subjectId = subjectIdFromObjectName(objectName);
     Blob blob = storage.get(BlobId.of(bucketName, objectName));
     if (blob == null) {
       throw new IllegalArgumentException("Blob not found: " + objectName);
@@ -60,7 +64,7 @@ public class KnowledgeIngestionService {
       }
 
       SourceDocumentMetadata source =
-          sourceMetadata(projectId, bucketName, objectName, blob, documentContent.getTextContent());
+          sourceMetadata(subjectId, bucketName, objectName, blob, documentContent.getTextContent());
 
       return processContent(source, documentContent);
     }
@@ -95,10 +99,20 @@ public class KnowledgeIngestionService {
         docKnowledge.getSubdomain());
 
     // ========================================================================
-    // Chunk the document
+    // Chunk the document (with subject context if available)
     // ========================================================================
     String fullTextContent = documentContent.getTextContent();
-    List<SemanticChunk> chunks = documentChunker.chunk(fullTextContent);
+
+    // Load subject context if this is a subject-based file
+    String subjectContext = loadSubjectContext(source.bucketName(), source.objectName());
+
+    List<SemanticChunk> chunks;
+    if (subjectContext != null) {
+      log.info("Chunking document with subject context");
+      chunks = documentChunker.chunk(fullTextContent, subjectContext);
+    } else {
+      chunks = documentChunker.chunk(fullTextContent);
+    }
     if (chunks.isEmpty()) {
       throw new IllegalArgumentException("Content is empty after chunking");
     }
@@ -131,7 +145,7 @@ public class KnowledgeIngestionService {
     // ========================================================================
     // Save chunks to semantic_chunks table (unchanged)
     // ========================================================================
-    String artifactId = storageService.saveDocument(source, chunks);
+    UUID artifactId = storageService.saveDocument(source, chunks);
 
     // ========================================================================
     // PHASE 4: Build Knowledge Graph (NEW)
@@ -145,10 +159,10 @@ public class KnowledgeIngestionService {
   }
 
   private SourceDocumentMetadata sourceMetadata(
-      String projectId, String bucketName, String objectName, Blob blob, String content) {
+      UUID subjectId, String bucketName, String objectName, Blob blob, String content) {
     String checksum = firstNonBlank(blob.getCrc32c(), blob.getMd5(), blob.getEtag());
     return new SourceDocumentMetadata(
-        projectId,
+        subjectId,
         bucketName,
         objectName,
         blob.getGeneration(),
@@ -159,16 +173,80 @@ public class KnowledgeIngestionService {
         title(objectName));
   }
 
-  private String projectIdFromObjectName(String objectName) {
-    // Extract project ID from path: staged/{projectId}/{date}/file or
-    // processed/{projectId}/{date}/file
-    String[] parts = objectName.split("/");
-    if (parts.length < 3) {
-      throw new IllegalArgumentException(
-          "GCS object must be stored under staged/{projectId}/{date}/ or processed/{projectId}/{date}/: "
-              + objectName);
+  /**
+   * Resolves subject UUID from a GCS object path by extracting subject name and looking it up in
+   * the database.
+   *
+   * @param objectName Full GCS object path
+   * @return Subject UUID
+   * @throws IllegalArgumentException if path is invalid or subject not found
+   */
+  private UUID subjectIdFromObjectName(String objectName) {
+    String subjectName = subjectNameFromObjectName(objectName);
+
+    return subjectRepository
+        .findBySubjectName(subjectName)
+        .map(subject -> subject.getSubjectId())
+        .orElseThrow(
+            () ->
+                new IllegalArgumentException(
+                    "Subject not found for name: "
+                        + subjectName
+                        + ". Please create the subject first via the Subject Management API."));
+  }
+
+  /**
+   * Extracts subject name from a GCS object path.
+   *
+   * @param objectName Full GCS object path
+   * @return Subject name
+   * @throws IllegalArgumentException if path format is invalid
+   */
+  private String subjectNameFromObjectName(String objectName) {
+    // Subject-based paths only: subjects/{subjectName}/file
+
+    if (objectName.startsWith("subjects/")) {
+      // Subject-based path - extract subject name
+      return subjectFromObjectName(objectName);
     }
-    return parts[1]; // Return the project ID (second segment)
+
+    throw new IllegalArgumentException(
+        "GCS object must be stored under subjects/{subjectName}/: " + objectName);
+  }
+
+  /**
+   * Extracts subject name from a subject-based GCS path.
+   *
+   * @param objectName Full GCS object path
+   * @return Subject name or null if not a subject-based path
+   */
+  private String subjectFromObjectName(String objectName) {
+    return gcsFolderManagementService.extractSubjectNameFromPath(objectName);
+  }
+
+  /**
+   * Loads subject context from definition.md if the file is in a subject folder.
+   *
+   * @param bucketName GCS bucket name
+   * @param objectName Full object path
+   * @return Subject context string or null if not a subject-based file
+   */
+  private String loadSubjectContext(String bucketName, String objectName) {
+    String subjectName = subjectFromObjectName(objectName);
+    if (subjectName == null) {
+      return null;
+    }
+
+    try {
+      String definitionContent = gcsFolderManagementService.readDefinitionFile(subjectName);
+      if (definitionContent != null) {
+        log.info("Loaded subject context for subject: {}", subjectName);
+      }
+      return definitionContent;
+    } catch (Exception e) {
+      log.warn("Could not load subject context for subject: {} - {}", subjectName, e.getMessage());
+      return null;
+    }
   }
 
   private String artifactType(String objectName) {

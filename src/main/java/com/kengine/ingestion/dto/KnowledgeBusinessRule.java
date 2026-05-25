@@ -10,9 +10,9 @@ import lombok.Data;
 @Builder
 public class KnowledgeBusinessRule {
   private UUID ruleId;
-  private String artifactId;
+  private UUID artifactId;
   private UUID componentId;
-  private String projectId;
+  private UUID subjectId;
   private UUID domainId;
   private String ruleName;
   private String ruleType;

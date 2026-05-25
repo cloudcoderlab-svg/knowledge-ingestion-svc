@@ -1,10 +1,12 @@
 package com.kengine.ingestion.dto;
 
+import java.util.UUID;
+
 public record SourceChunk(
-    String chunkId,
-    String documentId,
-    String artifactId,
-    String projectId,
+    UUID chunkId,
+    UUID documentId,
+    UUID artifactId,
+    UUID subjectId,
     String sourceBucket,
     String sourceObject,
     Long sourceGeneration,

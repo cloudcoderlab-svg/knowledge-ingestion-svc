@@ -8,5 +8,9 @@ import org.springframework.stereotype.Repository;
 
 @Repository
 public interface DomainRepository extends JpaRepository<DomainEntity, UUID> {
-  Optional<DomainEntity> findByProjectIdAndDomain(String projectId, String domainName);
+  Optional<DomainEntity> findBySubjectIdAndDomain(UUID subjectId, String domainName);
+
+  int deleteBySubjectId(UUID subjectId);
+
+  long countBySubjectId(UUID subjectId);
 }

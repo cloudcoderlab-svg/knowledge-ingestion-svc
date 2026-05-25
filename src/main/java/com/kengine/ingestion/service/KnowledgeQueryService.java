@@ -7,6 +7,7 @@ import com.kengine.ingestion.entity.SemanticChunkEntity;
 import com.kengine.ingestion.repository.ArtifactRepository;
 import com.kengine.ingestion.repository.SemanticChunkRepository;
 import java.util.List;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -23,10 +24,10 @@ public class KnowledgeQueryService {
   private final ArtifactRepository artifactRepository;
   private final SemanticChunkRepository semanticChunkRepository;
 
-  public List<KnowledgeSource> sources(String projectId) {
+  public List<KnowledgeSource> sources(UUID subjectId) {
     List<ArtifactEntity> artifacts =
         artifactRepository.findAll(
-            (root, query, cb) -> cb.equal(root.get("projectId"), projectId),
+            (root, query, cb) -> cb.equal(root.get("subjectId"), subjectId),
             Sort.by(Sort.Direction.DESC, "sourceObject", "createdAt"));
 
     return artifacts.stream()
@@ -34,7 +35,7 @@ public class KnowledgeQueryService {
             artifact ->
                 new KnowledgeSource(
                     artifact.getArtifactId(),
-                    artifact.getProjectId(),
+                    artifact.getSubjectId(),
                     artifact.getDomain(),
                     artifact.getSubdomain(),
                     artifact.getSourceBucket(),
@@ -51,11 +52,11 @@ public class KnowledgeQueryService {
   }
 
   public List<SourceChunk> chunks(
-      String projectId, String sourceObject, String query, Integer requestedLimit) {
+      UUID subjectId, String sourceObject, String query, Integer requestedLimit) {
     int limit = chunkLimit(requestedLimit);
 
     Specification<SemanticChunkEntity> spec =
-        (root, criteriaQuery, cb) -> cb.equal(root.get("projectId"), projectId);
+        (root, criteriaQuery, cb) -> cb.equal(root.get("subjectId"), subjectId);
 
     if (!isBlank(sourceObject)) {
       spec =
@@ -81,13 +82,13 @@ public class KnowledgeQueryService {
                     chunk.getChunkId(),
                     chunk.getDocumentId(),
                     chunk.getArtifactId(),
-                    chunk.getProjectId(),
+                    chunk.getSubjectId(),
                     chunk.getSourceBucket(),
                     chunk.getSourceObject(),
                     chunk.getSourceGeneration(),
                     chunk.getSourceChecksum(),
                     chunk.getDocumentContentHash(),
-                    chunk.getChunkIndex(),
+                    chunk.getChunkIndex() != null ? chunk.getChunkIndex().longValue() : null,
                     chunk.getTotalChunks(),
                     chunk.getCharStart(),
                     chunk.getCharEnd(),
@@ -95,7 +96,7 @@ public class KnowledgeQueryService {
                     chunk.getDomain(),
                     chunk.getSubdomain(),
                     chunk.getContent()))
-        .toList();
+        .collect(java.util.stream.Collectors.toList());
   }
 
   private int chunkLimit(Integer requestedLimit) {

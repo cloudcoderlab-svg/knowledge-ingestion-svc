@@ -6,9 +6,6 @@ import com.google.cloud.storage.BlobInfo;
 import com.google.cloud.storage.Storage;
 import com.google.cloud.storage.Storage.BlobListOption;
 import java.io.ByteArrayInputStream;
-import java.time.Instant;
-import java.time.ZoneOffset;
-import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
@@ -26,203 +23,7 @@ public class GcsFolderManagementService {
   @Value("${gcp.storage.bucket-name}")
   private String bucketName;
 
-  private static final String STAGED_PREFIX = "staged/";
-  private static final String PROCESSED_PREFIX = "processed/";
-  private static final DateTimeFormatter DATE_FORMATTER =
-      DateTimeFormatter.ofPattern("yyyy-MM-dd").withZone(ZoneOffset.UTC);
-
-  /**
-   * Creates project-specific folders in both staged and processed directories. Creates marker files
-   * to ensure folders exist in GCS.
-   */
-  public void createProjectFolder(String projectId) {
-    String stagedFolderPath = STAGED_PREFIX + projectId + "/.folder";
-    String processedFolderPath = PROCESSED_PREFIX + projectId + "/.folder";
-
-    createMarkerFile(stagedFolderPath);
-    createMarkerFile(processedFolderPath);
-
-    log.info("Created project folders (staged and processed) for project: {}", projectId);
-  }
-
-  /**
-   * Lists all files in a specific staged folder path (project + date).
-   *
-   * @param projectId Project identifier
-   * @param dateFolder Date folder name (yyyy-MM-dd)
-   * @return List of blob names (full paths)
-   */
-  public List<String> listFilesInStagedFolder(String projectId, String dateFolder) {
-    String prefix = STAGED_PREFIX + projectId + "/" + dateFolder + "/";
-    List<String> files = new ArrayList<>();
-
-    storage
-        .list(bucketName, BlobListOption.prefix(prefix))
-        .iterateAll()
-        .forEach(
-            blob -> {
-              String name = blob.getName();
-              // Exclude marker files and directory markers
-              if (!name.endsWith("/.folder") && !name.endsWith("/")) {
-                files.add(name);
-              }
-            });
-
-    log.debug("Found {} files in staged folder: {}", files.size(), prefix);
-    return files;
-  }
-
-  /**
-   * Moves a file from staged to processed folder.
-   *
-   * @param stagedBlobName Full path of the staged file
-   * @param projectId Project identifier
-   * @param dateFolder Date folder name (yyyy-MM-dd)
-   * @return The new blob name in processed folder
-   */
-  public String moveToProcessed(String stagedBlobName, String projectId, String dateFolder) {
-    Blob stagedBlob = storage.get(BlobId.of(bucketName, stagedBlobName));
-    if (stagedBlob == null) {
-      log.warn("Staged blob not found: {}", stagedBlobName);
-      return null;
-    }
-
-    // Extract filename from staged path
-    String fileName = extractFileName(stagedBlobName);
-    String processedBlobName = PROCESSED_PREFIX + projectId + "/" + dateFolder + "/" + fileName;
-
-    // Copy to processed folder
-    BlobId processedBlobId = BlobId.of(bucketName, processedBlobName);
-    storage.copy(
-        Storage.CopyRequest.newBuilder()
-            .setSource(bucketName, stagedBlobName)
-            .setTarget(processedBlobId)
-            .build());
-
-    // Delete from staged
-    stagedBlob.delete();
-
-    log.info("Moved file from staged to processed: {} -> {}", stagedBlobName, processedBlobName);
-    return processedBlobName;
-  }
-
-  /** Creates the default project folder if it doesn't exist. */
-  public void ensureDefaultProjectExists() {
-    createProjectFolder("default-project");
-  }
-
-  /**
-   * Gets all files from today's daily dated folder in the staged directory for processing.
-   *
-   * @param projectId Project identifier
-   * @return List of file paths from today's staged folder
-   */
-  public List<String> getTodaysFilesForProcessing(String projectId) {
-    String today = DATE_FORMATTER.format(Instant.now());
-    List<String> files = listFilesInStagedFolder(projectId, today);
-
-    log.info(
-        "Found {} files for processing in staged/{}/{} for today", files.size(), projectId, today);
-    return files;
-  }
-
-  /**
-   * Lists all files in a specific processed folder path (project + date).
-   *
-   * @param projectId Project identifier
-   * @param dateFolder Date folder name (yyyy-MM-dd)
-   * @return List of blob names (full paths)
-   */
-  public List<String> listFilesInProcessedFolder(String projectId, String dateFolder) {
-    String prefix = PROCESSED_PREFIX + projectId + "/" + dateFolder + "/";
-    List<String> files = new ArrayList<>();
-
-    storage
-        .list(bucketName, BlobListOption.prefix(prefix))
-        .iterateAll()
-        .forEach(
-            blob -> {
-              String name = blob.getName();
-              // Exclude marker files and directory markers
-              if (!name.endsWith("/.folder") && !name.endsWith("/")) {
-                files.add(name);
-              }
-            });
-
-    log.debug("Found {} files in processed folder: {}", files.size(), prefix);
-    return files;
-  }
-
-  /**
-   * Gets all files from today's daily dated folder in the processed directory.
-   *
-   * @param projectId Project identifier
-   * @return List of file paths from today's processed folder
-   */
-  public List<String> getTodaysProcessedFiles(String projectId) {
-    String today = DATE_FORMATTER.format(Instant.now());
-    List<String> files = listFilesInProcessedFolder(projectId, today);
-
-    log.info(
-        "Found {} processed files in processed/{}/{} for today", files.size(), projectId, today);
-    return files;
-  }
-
-  /**
-   * Creates daily dated folders for a project in both staged and processed directories. Uses
-   * ISO-8601 date format (yyyy-MM-dd). Only creates if they don't already exist.
-   *
-   * @param projectId Project identifier
-   * @return The date string used for folder naming (yyyy-MM-dd)
-   */
-  public String createDailyDatedFolders(String projectId) {
-    String today = DATE_FORMATTER.format(Instant.now());
-
-    String stagedFolder = STAGED_PREFIX + projectId + "/" + today + "/.folder";
-    String processedFolder = PROCESSED_PREFIX + projectId + "/" + today + "/.folder";
-
-    // Check if folders already exist
-    BlobId stagedBlobId = BlobId.of(bucketName, stagedFolder);
-    BlobId processedBlobId = BlobId.of(bucketName, processedFolder);
-
-    boolean stagedExists = storage.get(stagedBlobId) != null;
-    boolean processedExists = storage.get(processedBlobId) != null;
-
-    if (stagedExists && processedExists) {
-      log.debug("Daily dated folders already exist for project {} on {}", projectId, today);
-      return today;
-    }
-
-    // Create folders if they don't exist
-    if (!stagedExists) {
-      createMarkerFile(stagedFolder);
-    }
-    if (!processedExists) {
-      createMarkerFile(processedFolder);
-    }
-
-    log.info("Created daily dated folders for project {} on {}", projectId, today);
-    return today;
-  }
-
-  /**
-   * Checks if daily dated folders exist for today for a project.
-   *
-   * @param projectId Project identifier
-   * @return true if both staged and processed folders exist for today
-   */
-  public boolean dailyDatedFoldersExist(String projectId) {
-    String today = DATE_FORMATTER.format(Instant.now());
-    String stagedFolder = STAGED_PREFIX + projectId + "/" + today + "/.folder";
-    String processedFolder = PROCESSED_PREFIX + projectId + "/" + today + "/.folder";
-
-    BlobId stagedBlobId = BlobId.of(bucketName, stagedFolder);
-    BlobId processedBlobId = BlobId.of(bucketName, processedFolder);
-
-    boolean exists = storage.get(stagedBlobId) != null && storage.get(processedBlobId) != null;
-    log.debug("Daily dated folders exist for project {} on {}: {}", projectId, today, exists);
-    return exists;
-  }
+  private static final String SUBJECTS_PREFIX = "subjects/";
 
   private void createMarkerFile(String path) {
     BlobId blobId = BlobId.of(bucketName, path);
@@ -251,5 +52,134 @@ public class GcsFolderManagementService {
 
   public String getBucketName() {
     return bucketName;
+  }
+
+  // ============================================================================
+  // Subject-based GCS Structure Methods
+  // ============================================================================
+
+  /**
+   * Creates a subject folder in GCS.
+   *
+   * @param subjectName The subject name (used as folder name)
+   * @return The GCS folder URL
+   */
+  public String createSubjectFolder(String subjectName) {
+    String folderPath = SUBJECTS_PREFIX + subjectName + "/.folder";
+    createMarkerFile(folderPath);
+    log.info("Created subject folder for: {}", subjectName);
+    return "gs://" + bucketName + "/" + SUBJECTS_PREFIX + subjectName + "/";
+  }
+
+  /**
+   * Creates a definition.md file in the subject folder with context information.
+   *
+   * @param subjectName The subject name
+   * @param title The subject title
+   * @param description The subject description
+   * @param subjectId The subject UUID
+   * @return The GCS path to the definition.md file
+   */
+  public String createDefinitionFile(
+      String subjectName, String title, String description, String subjectId) {
+    String definitionPath = SUBJECTS_PREFIX + subjectName + "/definition.md";
+
+    String content =
+        String.format(
+            """
+            # %s
+
+            ## Description
+            %s
+
+            ## Purpose
+            This file provides context for AI-powered semantic chunking and knowledge extraction.
+
+            ---
+            *Auto-generated - Subject ID: %s*
+            """,
+            title, description, subjectId);
+
+    BlobId blobId = BlobId.of(bucketName, definitionPath);
+    BlobInfo blobInfo = BlobInfo.newBuilder(blobId).setContentType("text/markdown").build();
+
+    try {
+      storage.createFrom(blobInfo, new ByteArrayInputStream(content.getBytes()));
+      log.info("Created definition.md for subject: {}", subjectName);
+      return definitionPath;
+    } catch (Exception e) {
+      log.error("Error creating definition.md for subject: {}", subjectName, e);
+      throw new RuntimeException("Failed to create definition.md", e);
+    }
+  }
+
+  /**
+   * Lists all files in a subject folder, excluding definition.md and marker files.
+   *
+   * @param subjectName The subject name
+   * @return List of file paths
+   */
+  public List<String> listSubjectFiles(String subjectName) {
+    String prefix = SUBJECTS_PREFIX + subjectName + "/";
+    List<String> files = new ArrayList<>();
+
+    storage
+        .list(bucketName, BlobListOption.prefix(prefix))
+        .iterateAll()
+        .forEach(
+            blob -> {
+              String name = blob.getName();
+              // Exclude definition.md, marker files, and directory markers
+              if (!name.endsWith("/definition.md")
+                  && !name.endsWith("/.folder")
+                  && !name.endsWith("/")
+                  && !name.equals(prefix)) {
+                files.add(name);
+              }
+            });
+
+    log.debug("Found {} files in subject folder: {}", files.size(), subjectName);
+    return files;
+  }
+
+  /**
+   * Reads the definition.md content from a subject folder.
+   *
+   * @param subjectName The subject name
+   * @return The content of definition.md, or null if not found
+   */
+  public String readDefinitionFile(String subjectName) {
+    String definitionPath = SUBJECTS_PREFIX + subjectName + "/definition.md";
+    BlobId blobId = BlobId.of(bucketName, definitionPath);
+    Blob blob = storage.get(blobId);
+
+    if (blob == null) {
+      log.warn("definition.md not found for subject: {}", subjectName);
+      return null;
+    }
+
+    try {
+      byte[] content = blob.getContent();
+      return new String(content);
+    } catch (Exception e) {
+      log.error("Error reading definition.md for subject: {}", subjectName, e);
+      return null;
+    }
+  }
+
+  /**
+   * Extracts subject name from a GCS object path.
+   *
+   * @param objectPath Full GCS object path (e.g., subjects/healthcare-system/doc.pdf)
+   * @return Subject name or null if not in subjects folder
+   */
+  public String extractSubjectNameFromPath(String objectPath) {
+    if (!objectPath.startsWith(SUBJECTS_PREFIX)) {
+      return null;
+    }
+
+    String pathWithoutPrefix = objectPath.substring(SUBJECTS_PREFIX.length());
+    int firstSlash = pathWithoutPrefix.indexOf('/');
+    return firstSlash > 0 ? pathWithoutPrefix.substring(0, firstSlash) : pathWithoutPrefix;
   }
 }

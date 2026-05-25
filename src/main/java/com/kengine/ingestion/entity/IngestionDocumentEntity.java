@@ -2,11 +2,13 @@ package com.kengine.ingestion.entity;
 
 import jakarta.persistence.*;
 import java.time.OffsetDateTime;
+import java.util.UUID;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.UpdateTimestamp;
 
 @Entity
 @Table(name = "ingestion_documents")
@@ -17,34 +19,63 @@ import org.hibernate.annotations.CreationTimestamp;
 public class IngestionDocumentEntity {
 
   @Id
-  @Column(name = "document_id", length = 36, nullable = false)
-  private String documentId;
+  @GeneratedValue(strategy = GenerationType.UUID)
+  @Column(name = "document_id", nullable = false)
+  private UUID documentId;
 
-  @Column(name = "artifact_id", length = 36, nullable = false)
-  private String artifactId;
+  @Column(name = "subject_id", nullable = false)
+  private UUID subjectId;
 
-  @Column(name = "project_id", nullable = false)
-  private String projectId;
+  @Column(name = "artifact_id")
+  private UUID artifactId;
 
-  @Column(name = "source_bucket", nullable = false)
+  @Column(name = "document_name", length = 500)
+  private String documentName;
+
+  @Column(name = "document_type", length = 100)
+  private String documentType;
+
+  @Column(name = "gcs_url", columnDefinition = "text")
+  private String gcsUrl;
+
+  @Column(name = "file_size")
+  private Long fileSize;
+
+  @Column(name = "mime_type", length = 255)
+  private String mimeType;
+
+  @Column(name = "source_bucket", length = 255)
   private String sourceBucket;
 
-  @Column(name = "source_object", nullable = false)
+  @Column(name = "source_object", columnDefinition = "text")
   private String sourceObject;
+
+  @Column(name = "content_hash", length = 64)
+  private String contentHash;
+
+  @Column(name = "source_checksum", length = 64)
+  private String sourceChecksum;
 
   @Column(name = "source_generation")
   private Long sourceGeneration;
 
-  @Column(name = "source_checksum")
-  private String sourceChecksum;
+  @Column(name = "chunk_count")
+  private Integer chunkCount;
 
-  @Column(name = "content_hash", length = 64, nullable = false)
-  private String contentHash;
+  @Column(name = "extraction_status", length = 50)
+  private String extractionStatus;
 
-  @Column(name = "chunk_count", nullable = false)
-  private Long chunkCount;
+  @Column(name = "error_message", columnDefinition = "text")
+  private String errorMessage;
+
+  @Column(name = "metadata", columnDefinition = "jsonb")
+  private String metadata;
 
   @Column(name = "created_at")
   @CreationTimestamp
   private OffsetDateTime createdAt;
+
+  @Column(name = "updated_at")
+  @UpdateTimestamp
+  private OffsetDateTime updatedAt;
 }

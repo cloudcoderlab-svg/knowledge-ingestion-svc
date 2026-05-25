@@ -11,8 +11,8 @@ import lombok.Data;
 @Builder
 public class KnowledgeDataModel {
   private UUID dataModelId;
-  private String artifactId;
-  private String projectId;
+  private UUID artifactId;
+  private UUID subjectId;
   private UUID domainId;
   private String modelName;
   private String modelType;

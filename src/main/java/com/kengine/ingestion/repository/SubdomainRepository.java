@@ -9,4 +9,8 @@ import org.springframework.stereotype.Repository;
 @Repository
 public interface SubdomainRepository extends JpaRepository<SubdomainEntity, UUID> {
   Optional<SubdomainEntity> findByDomainIdAndSubdomain(UUID domainId, String subdomainName);
+
+  int deleteBySubjectId(UUID subjectId);
+
+  long countBySubjectId(UUID subjectId);
 }

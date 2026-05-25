@@ -11,8 +11,8 @@ import lombok.Data;
 @Builder
 public class KnowledgeComponent {
   private UUID componentId;
-  private String artifactId;
-  private String projectId;
+  private UUID artifactId;
+  private UUID subjectId;
   private UUID domainId;
   private UUID subdomainId;
   private String componentName;
