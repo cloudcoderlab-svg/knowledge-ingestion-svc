@@ -69,6 +69,7 @@ public class IngestionDocumentEntity {
   private String errorMessage;
 
   @Column(name = "metadata", columnDefinition = "jsonb")
+  @org.hibernate.annotations.JdbcTypeCode(org.hibernate.type.SqlTypes.JSON)
   private String metadata;
 
   @Column(name = "created_at")
@@ -78,4 +79,8 @@ public class IngestionDocumentEntity {
   @Column(name = "updated_at")
   @UpdateTimestamp
   private OffsetDateTime updatedAt;
+
+  @Version
+  @Column(name = "version")
+  private Long version;
 }

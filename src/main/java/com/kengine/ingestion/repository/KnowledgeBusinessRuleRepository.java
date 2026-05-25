@@ -34,6 +34,8 @@ public interface KnowledgeBusinessRuleRepository
 
   int deleteBySubjectId(UUID subjectId);
 
+  int deleteByArtifactId(UUID artifactId);
+
   long countBySubjectId(UUID subjectId);
 
   @Query(

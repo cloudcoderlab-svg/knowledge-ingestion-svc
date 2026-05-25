@@ -12,6 +12,8 @@ import org.springframework.stereotype.Repository;
 public interface KnowledgeWorkflowRepository extends JpaRepository<KnowledgeWorkflowEntity, UUID> {
   int deleteBySubjectId(UUID subjectId);
 
+  int deleteByArtifactId(UUID artifactId);
+
   long countBySubjectId(UUID subjectId);
 
   @Query(

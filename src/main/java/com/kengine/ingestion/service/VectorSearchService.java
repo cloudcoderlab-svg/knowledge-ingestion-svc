@@ -3,13 +3,12 @@ package com.kengine.ingestion.service;
 import com.kengine.ingestion.dto.*;
 import com.kengine.ingestion.entity.DomainEntity;
 import com.kengine.ingestion.repository.*;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.stereotype.Service;
-
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Service;
 
 @Service
 @RequiredArgsConstructor
@@ -65,8 +64,7 @@ public class VectorSearchService {
             .filter(result -> filterByThreshold(result, request.getThreshold()))
             .collect(Collectors.toList());
 
-    return buildResponse(
-        searchResults, request.hasQueryText() ? "text" : "embedding", "component");
+    return buildResponse(searchResults, request.hasQueryText() ? "text" : "embedding", "component");
   }
 
   public VectorSearchResponse<BusinessRuleSearchResult> searchBusinessRules(
@@ -109,14 +107,12 @@ public class VectorSearchService {
             .filter(result -> filterByThreshold(result, request.getThreshold()))
             .collect(Collectors.toList());
 
-    return buildResponse(
-        searchResults, request.hasQueryText() ? "text" : "embedding", "workflow");
+    return buildResponse(searchResults, request.hasQueryText() ? "text" : "embedding", "workflow");
   }
 
   private void validateRequest(VectorSearchRequest request) {
     if (!request.isValid()) {
-      throw new IllegalArgumentException(
-          "Exactly one of queryText or embedding must be provided");
+      throw new IllegalArgumentException("Exactly one of queryText or embedding must be provided");
     }
   }
 

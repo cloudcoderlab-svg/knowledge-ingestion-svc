@@ -9,5 +9,7 @@ import org.springframework.stereotype.Repository;
 public interface KnowledgeAPIRepository extends JpaRepository<KnowledgeAPIEntity, UUID> {
   int deleteBySubjectId(UUID subjectId);
 
+  int deleteByArtifactId(UUID artifactId);
+
   long countBySubjectId(UUID subjectId);
 }

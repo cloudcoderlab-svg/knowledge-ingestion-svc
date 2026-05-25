@@ -13,5 +13,7 @@ public interface IngestionDocumentRepository
 
   int deleteBySubjectId(UUID subjectId);
 
+  int deleteByArtifactId(UUID artifactId);
+
   long countBySubjectId(UUID subjectId);
 }

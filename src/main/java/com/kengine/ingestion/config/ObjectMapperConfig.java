@@ -26,6 +26,21 @@ public class ObjectMapperConfig {
     // Configure to handle unknown properties gracefully
     mapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
 
+    // Handle empty strings as null objects
+    mapper.configure(DeserializationFeature.ACCEPT_EMPTY_STRING_AS_NULL_OBJECT, true);
+
+    // Allow coercion of scalars to and from empty strings
+    mapper.configure(DeserializationFeature.ACCEPT_EMPTY_ARRAY_AS_NULL_OBJECT, true);
+
+    // Accept single value as array
+    mapper.configure(DeserializationFeature.ACCEPT_SINGLE_VALUE_AS_ARRAY, true);
+
+    // Don't fail on reading null values for primitive types
+    mapper.configure(DeserializationFeature.FAIL_ON_NULL_FOR_PRIMITIVES, false);
+
+    // Don't fail on invalid type conversions - coerce to null instead
+    mapper.configure(DeserializationFeature.FAIL_ON_INVALID_SUBTYPE, false);
+
     // Disable writing dates as timestamps (use ISO-8601 format instead)
     mapper.disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
 

@@ -7,4 +7,6 @@ import org.springframework.stereotype.Repository;
 
 @Repository
 public interface KnowledgeDataModelRepository
-    extends JpaRepository<KnowledgeDataModelEntity, UUID> {}
+    extends JpaRepository<KnowledgeDataModelEntity, UUID> {
+  int deleteByArtifactId(UUID artifactId);
+}

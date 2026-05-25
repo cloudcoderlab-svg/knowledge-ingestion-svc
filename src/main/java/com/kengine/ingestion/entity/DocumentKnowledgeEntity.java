@@ -43,6 +43,9 @@ public class DocumentKnowledgeEntity {
   @Column(name = "document_type", length = 100)
   private String documentType;
 
+  @Column(name = "overall_architecture", columnDefinition = "text")
+  private String overallArchitecture;
+
   @Column(name = "key_entities", columnDefinition = "text[]")
   private String[] keyEntities;
 
@@ -51,6 +54,30 @@ public class DocumentKnowledgeEntity {
 
   @Column(name = "technologies", columnDefinition = "text[]")
   private String[] technologies;
+
+  @Column(name = "identified_components", columnDefinition = "text[]")
+  private String[] identifiedComponents;
+
+  @Column(name = "identified_apis", columnDefinition = "text[]")
+  private String[] identifiedApis;
+
+  @Column(name = "identified_workflows", columnDefinition = "text[]")
+  private String[] identifiedWorkflows;
+
+  @Column(name = "identified_capabilities", columnDefinition = "text[]")
+  private String[] identifiedCapabilities;
+
+  @Column(name = "identified_roles", columnDefinition = "text[]")
+  private String[] identifiedRoles;
+
+  @Column(name = "identified_terms", columnDefinition = "text[]")
+  private String[] identifiedTerms;
+
+  @Column(name = "identified_policies", columnDefinition = "text[]")
+  private String[] identifiedPolicies;
+
+  @Column(name = "identified_decisions", columnDefinition = "text[]")
+  private String[] identifiedDecisions;
 
   @Column(name = "extracted_at")
   private OffsetDateTime extractedAt;

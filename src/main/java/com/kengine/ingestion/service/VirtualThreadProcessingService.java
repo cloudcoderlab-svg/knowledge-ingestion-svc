@@ -11,7 +11,6 @@ import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.atomic.AtomicInteger;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -26,6 +25,8 @@ public class VirtualThreadProcessingService {
   private final KnowledgeIngestionService knowledgeIngestionService;
   private final GcsFolderManagementService gcsFolderManagementService;
   private final SubjectRepository subjectRepository;
+  private final PostgresStorageService storageService;
+  private final CrossDocumentRelationshipService crossDocumentRelationshipService;
 
   @Value("${gcp.storage.bucket-name}")
   private String bucketName;
@@ -96,73 +97,56 @@ public class VirtualThreadProcessingService {
             .findById(process.getSubjectId())
             .orElseThrow(() -> new IllegalArgumentException("Subject not found"));
 
-    log.info("Starting concurrent processing of {} files for process {}", files.size(), processId);
+    // STEP 1: Clean up duplicate artifacts before processing
+    log.info("Cleaning up duplicate artifacts for subject: {}", process.getSubjectId());
+    try {
+      int deletedDuplicates = storageService.cleanupDuplicateArtifacts(process.getSubjectId());
+      log.info("Cleanup completed. Deleted {} duplicate artifacts", deletedDuplicates);
+    } catch (Exception e) {
+      log.error(
+          "Error during duplicate cleanup: {}. Continuing with processing.", e.getMessage(), e);
+    }
+
+    log.info("Starting sequential processing of {} files for process {}", files.size(), processId);
 
     // Track success/failure counts
-    AtomicInteger successCount = new AtomicInteger(0);
-    AtomicInteger failureCount = new AtomicInteger(0);
+    int successCount = 0;
+    int failureCount = 0;
 
-    // Process all files concurrently using virtual threads
-    List<CompletableFuture<Void>> futures =
-        files.stream()
-            .map(
-                file ->
-                    CompletableFuture.runAsync(
-                        () -> processFile(processId, file, subject, successCount, failureCount),
-                        virtualThreadExecutor))
-            .toList();
+    // Process all files sequentially to avoid optimistic lock conflicts
+    for (String file : files) {
+      try {
+        log.info("Processing file: {} for process: {}", file, processId);
 
-    // Wait for all files to complete
-    CompletableFuture.allOf(futures.toArray(new CompletableFuture[0]))
-        .whenComplete(
-            (result, throwable) ->
-                updateFinalStatus(processId, successCount.get(), failureCount.get(), throwable));
-  }
+        // Update current file
+        processTrackingService.updateProgress(processId, successCount, failureCount, file);
 
-  /**
-   * Processes a single file.
-   *
-   * @param processId Process UUID
-   * @param file File path
-   * @param subject Subject entity
-   * @param successCount Success counter
-   * @param failureCount Failure counter
-   */
-  private void processFile(
-      UUID processId,
-      String file,
-      SubjectEntity subject,
-      AtomicInteger successCount,
-      AtomicInteger failureCount) {
-    try {
-      log.info("Processing file: {} for process: {}", file, processId);
+        // Ingest the file
+        knowledgeIngestionService.ingestFromGcs(bucketName, file);
 
-      // Update current file
-      processTrackingService.updateProgress(
-          processId, successCount.get(), failureCount.get(), file);
+        // Mark as success
+        successCount++;
+        processTrackingService.markFileProcessed(processId, file, true, null);
 
-      // Ingest the file
-      knowledgeIngestionService.ingestFromGcs(bucketName, file);
+        log.info(
+            "Successfully processed file: {} ({}/{} completed)",
+            file,
+            successCount + failureCount,
+            files.size());
 
-      // Mark as success
-      int currentSuccess = successCount.incrementAndGet();
-      processTrackingService.markFileProcessed(processId, file, true, null);
+      } catch (Exception e) {
+        log.error("Failed to process file: {} - {}", file, e.getMessage(), e);
 
-      log.info(
-          "Successfully processed file: {} ({}/{} completed)",
-          file,
-          currentSuccess + failureCount.get(),
-          currentSuccess + failureCount.get());
+        // Mark as failed
+        failureCount++;
+        processTrackingService.markFileProcessed(processId, file, false, e.getMessage());
 
-    } catch (Exception e) {
-      log.error("Failed to process file: {} - {}", file, e.getMessage(), e);
-
-      // Mark as failed
-      int currentFailure = failureCount.incrementAndGet();
-      processTrackingService.markFileProcessed(processId, file, false, e.getMessage());
-
-      log.warn("Failed to process file: {} ({} failures so far)", file, currentFailure);
+        log.warn("Failed to process file: {} ({} failures so far)", file, failureCount);
+      }
     }
+
+    // Update final status after all files are processed
+    updateFinalStatus(processId, successCount, failureCount, null);
   }
 
   /**
@@ -195,12 +179,64 @@ public class VirtualThreadProcessingService {
             String.format(
                 "Completed with %d failures out of %d files",
                 failureCount, successCount + failureCount));
+
+        // Trigger cross-document relationship analysis for successful ingestion
+        triggerCrossDocumentAnalysis(processId);
       } else {
         log.info("Processing completed successfully for process: {}", processId);
         processTrackingService.updateStatus(processId, ProcessStatus.SUCCESS, null);
+
+        // Trigger cross-document relationship analysis after successful ingestion
+        triggerCrossDocumentAnalysis(processId);
       }
     } catch (Exception e) {
       log.error("Error updating final status for process: {}", processId, e);
+    }
+  }
+
+  /**
+   * Triggers cross-document relationship analysis for the subject associated with the process.
+   *
+   * @param processId Process UUID
+   */
+  private void triggerCrossDocumentAnalysis(UUID processId) {
+    try {
+      // Get the process to retrieve subject information
+      ProcessTrackingEntity process = processTrackingService.getProcessEntity(processId);
+      UUID subjectId = process.getSubjectId();
+
+      // Get subject details
+      SubjectEntity subject =
+          subjectRepository
+              .findById(subjectId)
+              .orElseThrow(() -> new IllegalArgumentException("Subject not found"));
+
+      log.info(
+          "Triggering cross-document relationship analysis for subject: {} ({})",
+          subject.getSubjectName(),
+          subjectId);
+
+      // Run cross-document analysis asynchronously in a virtual thread
+      CompletableFuture.runAsync(
+          () -> {
+            try {
+              crossDocumentRelationshipService.analyzeAndInferRelationships(
+                  subjectId, subject.getSubjectName());
+              log.info(
+                  "Cross-document relationship analysis completed for subject: {}",
+                  subject.getSubjectName());
+            } catch (Exception e) {
+              log.error(
+                  "Error during cross-document relationship analysis for subject: {}",
+                  subject.getSubjectName(),
+                  e);
+            }
+          },
+          virtualThreadExecutor);
+
+    } catch (Exception e) {
+      log.error(
+          "Error triggering cross-document relationship analysis for process: {}", processId, e);
     }
   }
 }

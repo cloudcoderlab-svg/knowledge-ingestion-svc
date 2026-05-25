@@ -15,6 +15,8 @@ public interface KnowledgeComponentRepository
 
   int deleteBySubjectId(UUID subjectId);
 
+  int deleteByArtifactId(UUID artifactId);
+
   long countBySubjectId(UUID subjectId);
 
   @Query(

@@ -1,0 +1,80 @@
+You are an expert at analyzing enterprise software documentation to identify relationships BETWEEN documents.
+
+You are analyzing multiple documents from the same subject/project to identify:
+1. **Cross-document entity references** - When entities in one document reference or relate to entities in another document
+2. **Shared components** - Components that appear in multiple documents and how they interact
+3. **Inter-document dependencies** - Dependencies, data flows, and interactions between entities across documents
+4. **Architectural relationships** - How different parts of the system (described in different documents) relate to each other
+
+=== SUBJECT CONTEXT ===
+Subject: {{SUBJECT_NAME}}
+Domain: {{DOMAIN}}
+Subdomain: {{SUBDOMAIN}}
+Overall Architecture: {{OVERALL_ARCHITECTURE}}
+
+=== DOCUMENT SUMMARIES ===
+{{DOCUMENT_SUMMARIES}}
+
+=== YOUR TASK ===
+
+Analyze the document summaries above and identify relationships BETWEEN documents. Focus on:
+
+1. **Entity Matching**: Identify when the same entity (component, API, workflow, role, capability, term) is mentioned in multiple documents
+   - Look for exact name matches
+   - Look for similar names that likely refer to the same entity
+   - Note which documents mention each entity
+
+2. **Cross-Document Relationships**: Identify relationships where:
+   - An entity in Document A depends on, calls, or uses an entity in Document B
+   - An entity appears in multiple documents with different contexts
+   - Data flows or interactions span multiple documents
+
+3. **Integration Points**: Identify where documents describe:
+   - API contracts where one doc defines the provider and another the consumer
+   - Shared data models referenced by multiple documents
+   - Workflows that span components described in different documents
+
+CRITICAL GUIDELINES:
+- Only create relationships where there is CLEAR evidence from the document summaries
+- Use EXACT entity names as they appear in the summaries
+- For each relationship, cite which documents provide the evidence
+- Focus on INTER-document relationships, not intra-document relationships
+- Assign confidence scores based on clarity of evidence
+
+Return ONLY valid JSON using this exact structure:
+
+{
+  "crossDocumentInsights": {
+    "sharedEntities": [
+      {
+        "entityName": "Exact name of the entity",
+        "entityType": "component|api|workflow|role|capability|term|data_model",
+        "appearsInDocuments": ["Document 1 name", "Document 2 name"],
+        "consistencyScore": 0.0,
+        "notes": "How the entity is described across documents - are descriptions consistent?"
+      }
+    ],
+    "architecturalInsights": "Overall insights about how these documents fit together architecturally"
+  },
+
+  "crossDocumentRelationships": [
+    {
+      "sourceName": "Entity from source document",
+      "sourceType": "business_role|business_capability|business_flow|business_rule|solution_component|deployment_resource|data_model|api|workflow",
+      "sourceDocument": "Name of the document containing the source entity",
+      "targetName": "Entity from target document",
+      "targetType": "business_role|business_capability|business_flow|business_rule|solution_component|deployment_resource|data_model|api|workflow",
+      "targetDocument": "Name of the document containing the target entity",
+      "relationshipType": "depends_on|calls|implements|extends|contains|produces|consumes|triggers|uses|integrates_with|shares_data_with",
+      "context": "Description of how these entities relate across documents",
+      "evidence": "Specific evidence from the summaries supporting this relationship",
+      "confidence": 0.0
+    }
+  ]
+}
+
+IMPORTANT:
+- Empty arrays are acceptable if no clear cross-document relationships are found
+- Only include relationships with confidence >= 0.6
+- Be conservative - it's better to miss a relationship than to create a false one
+- NO markdown formatting, NO explanations, ONLY the JSON object

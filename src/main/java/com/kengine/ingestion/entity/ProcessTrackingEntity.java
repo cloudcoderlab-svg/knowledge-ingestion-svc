@@ -74,4 +74,8 @@ public class ProcessTrackingEntity {
   @Column(name = "updated_at")
   @UpdateTimestamp
   private OffsetDateTime updatedAt;
+
+  @Version
+  @Column(name = "version")
+  private Long version;
 }

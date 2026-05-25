@@ -60,8 +60,18 @@ public class EnhancedKnowledgeExtractionService {
       String response = vertexAIService.generate(prompt);
 
       // Parse JSON response
-      KnowledgeExtractionResult result =
-          mapper.readValue(JsonResponseExtractor.object(response), KnowledgeExtractionResult.class);
+      String jsonResponse = JsonResponseExtractor.object(response);
+      KnowledgeExtractionResult result;
+
+      try {
+        result = mapper.readValue(jsonResponse, KnowledgeExtractionResult.class);
+      } catch (com.fasterxml.jackson.databind.exc.MismatchedInputException e) {
+        log.warn(
+            "JSON deserialization mismatch (AI returned unexpected types). Attempting lenient parsing: {}",
+            e.getMessage());
+        // Try with lenient reader that skips problematic fields
+        result = parseLenient(jsonResponse);
+      }
 
       log.debug(
           "Enhanced extraction completed. Rules: {}, Components: {}, Relationships: {}",
@@ -113,6 +123,19 @@ public class EnhancedKnowledgeExtractionService {
         prompt.replace(
             "{{IDENTIFIED_WORKFLOWS}}",
             StringUtils.safeListToString(docContext.getIdentifiedWorkflows(), "None identified"));
+    prompt =
+        prompt.replace(
+            "{{IDENTIFIED_CAPABILITIES}}",
+            StringUtils.safeListToString(
+                docContext.getIdentifiedCapabilities(), "None identified"));
+    prompt =
+        prompt.replace(
+            "{{IDENTIFIED_ROLES}}",
+            StringUtils.safeListToString(docContext.getIdentifiedRoles(), "None identified"));
+    prompt =
+        prompt.replace(
+            "{{IDENTIFIED_TERMS}}",
+            StringUtils.safeListToString(docContext.getIdentifiedTerms(), "None identified"));
 
     // Replace chunk content
     prompt = prompt.replace("{{CHUNK_CONTENT}}", chunkContent);
@@ -194,5 +217,39 @@ public class EnhancedKnowledgeExtractionService {
       case IBM_INFOSPHERE_MDM -> "prompt/ibm-infosphere-mdm-extraction-prompt.txt";
       default -> "prompt/enhanced-chunk-extraction-prompt.txt";
     };
+  }
+
+  /**
+   * Parses JSON with lenient handling of type mismatches. Creates a new ObjectMapper configured to
+   * skip invalid values in collections.
+   *
+   * @param jsonResponse JSON string to parse
+   * @return Parsed KnowledgeExtractionResult with potentially missing fields
+   */
+  private KnowledgeExtractionResult parseLenient(String jsonResponse) throws Exception {
+    ObjectMapper lenientMapper = new ObjectMapper();
+    // Copy configuration from main mapper
+    lenientMapper.configure(
+        com.fasterxml.jackson.databind.DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+    lenientMapper.configure(
+        com.fasterxml.jackson.databind.DeserializationFeature.ACCEPT_EMPTY_STRING_AS_NULL_OBJECT,
+        true);
+    lenientMapper.configure(
+        com.fasterxml.jackson.databind.DeserializationFeature.ACCEPT_EMPTY_ARRAY_AS_NULL_OBJECT,
+        true);
+    // Add additional lenient settings
+    lenientMapper.configure(
+        com.fasterxml.jackson.databind.DeserializationFeature.READ_UNKNOWN_ENUM_VALUES_AS_NULL,
+        true);
+    lenientMapper.configure(
+        com.fasterxml.jackson.core.JsonParser.Feature.ALLOW_UNQUOTED_FIELD_NAMES, true);
+
+    // Try to parse - if it still fails, return empty result
+    try {
+      return lenientMapper.readValue(jsonResponse, KnowledgeExtractionResult.class);
+    } catch (Exception e) {
+      log.warn("Even lenient parsing failed. Returning empty result: {}", e.getMessage());
+      return new KnowledgeExtractionResult();
+    }
   }
 }

@@ -13,6 +13,7 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -146,35 +147,67 @@ public class ProcessTrackingService {
    */
   @Transactional
   public void markFileProcessed(UUID processId, String file, boolean success, String error) {
-    ProcessTrackingEntity process =
-        processTrackingRepository
-            .findById(processId)
-            .orElseThrow(() -> new IllegalArgumentException("Process not found: " + processId));
+    retryOnOptimisticLock(
+        () -> {
+          ProcessTrackingEntity process =
+              processTrackingRepository
+                  .findById(processId)
+                  .orElseThrow(
+                      () -> new IllegalArgumentException("Process not found: " + processId));
 
-    int processed = process.getProcessedFiles() != null ? process.getProcessedFiles() : 0;
-    int failed = process.getFailedFiles() != null ? process.getFailedFiles() : 0;
+          int processed = process.getProcessedFiles() != null ? process.getProcessedFiles() : 0;
+          int failed = process.getFailedFiles() != null ? process.getFailedFiles() : 0;
 
-    if (success) {
-      processed++;
-    } else {
-      failed++;
+          if (success) {
+            processed++;
+          } else {
+            failed++;
 
-      // Track error details
-      Map<String, Object> errorDetails = process.getErrorDetails();
-      if (errorDetails == null) {
-        errorDetails = new HashMap<>();
+            // Track error details
+            Map<String, Object> errorDetails = process.getErrorDetails();
+            if (errorDetails == null) {
+              errorDetails = new HashMap<>();
+            }
+            errorDetails.put(file, error);
+            process.setErrorDetails(errorDetails);
+          }
+
+          process.setProcessedFiles(processed);
+          process.setFailedFiles(failed);
+
+          processTrackingRepository.save(process);
+
+          log.debug(
+              "Marked file {} as {} for process {}",
+              file,
+              success ? "success" : "failed",
+              processId);
+        });
+  }
+
+  /** Retries an operation on optimistic lock failure. */
+  private void retryOnOptimisticLock(Runnable operation) {
+    int maxRetries = 10;
+    int attempt = 0;
+    while (attempt < maxRetries) {
+      try {
+        operation.run();
+        return;
+      } catch (ObjectOptimisticLockingFailureException e) {
+        attempt++;
+        if (attempt >= maxRetries) {
+          log.error("Failed after {} retries due to optimistic locking", maxRetries);
+          throw e;
+        }
+        log.debug("Optimistic lock failure, retrying ({}/{})", attempt, maxRetries);
+        try {
+          Thread.sleep(100 * attempt); // Exponential backoff
+        } catch (InterruptedException ie) {
+          Thread.currentThread().interrupt();
+          throw new RuntimeException("Interrupted during retry backoff", ie);
+        }
       }
-      errorDetails.put(file, error);
-      process.setErrorDetails(errorDetails);
     }
-
-    process.setProcessedFiles(processed);
-    process.setFailedFiles(failed);
-
-    processTrackingRepository.save(process);
-
-    log.info(
-        "Marked file {} as {} for process {}", file, success ? "success" : "failed", processId);
   }
 
   /**
@@ -224,6 +257,22 @@ public class ProcessTrackingService {
    */
   public List<ProcessResponse> listProcessesByStatus(ProcessStatus status) {
     return processTrackingRepository.findByStatusOrderByCreatedAtDesc(status).stream()
+        .map(this::toProcessResponse)
+        .collect(Collectors.toList());
+  }
+
+  /**
+   * Lists all processes for a subject filtered by status.
+   *
+   * @param subjectId Subject UUID
+   * @param status Process status
+   * @return List of process responses
+   */
+  public List<ProcessResponse> listProcessesBySubjectAndStatus(
+      UUID subjectId, ProcessStatus status) {
+    return processTrackingRepository
+        .findBySubjectIdAndStatusOrderByCreatedAtDesc(subjectId, status)
+        .stream()
         .map(this::toProcessResponse)
         .collect(Collectors.toList());
   }

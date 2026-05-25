@@ -17,4 +17,38 @@
         </rollback>
     </changeSet>
 
+    <!-- Add version columns for optimistic locking -->
+    <changeSet id="002-add-version-columns" author="kengine">
+        <sqlFile
+            path="db/changelog/sql/002-add-version-columns.sql"
+            relativeToChangelogFile="false"
+            splitStatements="true"
+            stripComments="false"/>
+        <rollback>
+            ALTER TABLE ingestion_documents DROP COLUMN IF EXISTS version;
+            ALTER TABLE knowledge.knowledge_ingestion_process DROP COLUMN IF EXISTS version;
+        </rollback>
+    </changeSet>
+
+    <!-- Add document knowledge fields for enhanced entity tracking and cross-document analysis -->
+    <changeSet id="003-add-document-knowledge-fields" author="kengine">
+        <sqlFile
+            path="db/changelog/sql/003-add-document-knowledge-fields.sql"
+            relativeToChangelogFile="false"
+            splitStatements="true"
+            stripComments="false"/>
+        <rollback>
+            ALTER TABLE document_knowledge
+                DROP COLUMN IF EXISTS overall_architecture,
+                DROP COLUMN IF EXISTS identified_components,
+                DROP COLUMN IF EXISTS identified_apis,
+                DROP COLUMN IF EXISTS identified_workflows,
+                DROP COLUMN IF EXISTS identified_capabilities,
+                DROP COLUMN IF EXISTS identified_roles,
+                DROP COLUMN IF EXISTS identified_terms,
+                DROP COLUMN IF EXISTS identified_policies,
+                DROP COLUMN IF EXISTS identified_decisions;
+        </rollback>
+    </changeSet>
+
 </databaseChangeLog>

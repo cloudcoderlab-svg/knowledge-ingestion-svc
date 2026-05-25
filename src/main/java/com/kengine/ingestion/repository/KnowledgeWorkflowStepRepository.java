@@ -7,4 +7,6 @@ import org.springframework.stereotype.Repository;
 
 @Repository
 public interface KnowledgeWorkflowStepRepository
-    extends JpaRepository<KnowledgeWorkflowStepEntity, UUID> {}
+    extends JpaRepository<KnowledgeWorkflowStepEntity, UUID> {
+  int deleteByWorkflowId(UUID workflowId);
+}

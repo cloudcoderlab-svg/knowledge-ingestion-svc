@@ -89,6 +89,7 @@ public class SemanticChunkEntity {
   private String embeddingStatus;
 
   @Column(name = "metadata", columnDefinition = "jsonb")
+  @org.hibernate.annotations.JdbcTypeCode(org.hibernate.type.SqlTypes.JSON)
   private String metadata;
 
   @Column(name = "created_at")

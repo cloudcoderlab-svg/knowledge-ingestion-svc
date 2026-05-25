@@ -1,8 +1,10 @@
 package com.kengine.ingestion.dto;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import java.util.List;
 import lombok.Data;
 
+@JsonIgnoreProperties(ignoreUnknown = true)
 @Data
 public class DeploymentResource {
   private String resourceName;

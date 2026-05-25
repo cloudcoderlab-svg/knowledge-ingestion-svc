@@ -142,7 +142,8 @@ public class KnowledgeGraphService {
     }
   }
 
-  private void saveDocumentKnowledge(UUID artifactId, UUID subjectId, DocumentKnowledge docKnowledge) {
+  private void saveDocumentKnowledge(
+      UUID artifactId, UUID subjectId, DocumentKnowledge docKnowledge) {
     try {
       storageService.saveDocumentKnowledge(artifactId, subjectId, docKnowledge);
       log.debug("Saved document knowledge for artifact: {}", artifactId);

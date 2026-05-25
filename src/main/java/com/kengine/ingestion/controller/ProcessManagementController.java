@@ -64,16 +64,25 @@ public class ProcessManagementController {
   }
 
   /**
-   * Lists all processes for a subject.
+   * Lists all processes for a subject, optionally filtered by status.
    *
    * @param subjectId Subject UUID
+   * @param status Optional process status filter (e.g., SUCCESS, FAILED, IN_PROGRESS)
    * @return List of process responses
    */
   @GetMapping("/subjects/{subjectId}/processes")
-  public ResponseEntity<List<ProcessResponse>> listSubjectProcesses(@PathVariable UUID subjectId) {
-    log.info("Listing processes for subject: {}", subjectId);
-    List<ProcessResponse> response = processTrackingService.listProcessesBySubject(subjectId);
-    return ResponseEntity.ok(response);
+  public ResponseEntity<List<ProcessResponse>> listSubjectProcesses(
+      @PathVariable UUID subjectId, @RequestParam(required = false) ProcessStatus status) {
+    if (status != null) {
+      log.info("Listing processes for subject: {} with status: {}", subjectId, status);
+      List<ProcessResponse> response =
+          processTrackingService.listProcessesBySubjectAndStatus(subjectId, status);
+      return ResponseEntity.ok(response);
+    } else {
+      log.info("Listing all processes for subject: {}", subjectId);
+      List<ProcessResponse> response = processTrackingService.listProcessesBySubject(subjectId);
+      return ResponseEntity.ok(response);
+    }
   }
 
   /**

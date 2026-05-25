@@ -3,11 +3,14 @@ package com.kengine.ingestion.service;
 import com.kengine.ingestion.dto.*;
 import com.kengine.ingestion.entity.*;
 import com.kengine.ingestion.repository.*;
+import jakarta.persistence.EntityManager;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
@@ -32,6 +35,7 @@ public class PostgresStorageService {
   private final KnowledgeIntegrationRepository knowledgeIntegrationRepository;
   private final KnowledgeResourceRepository knowledgeResourceRepository;
   private final KnowledgeRelationshipRepository knowledgeRelationshipRepository;
+  private final EntityManager entityManager;
 
   /**
    * Converts a List<Double> embedding to pgvector string format: "[0.1, 0.2, 0.3]".
@@ -53,20 +57,115 @@ public class PostgresStorageService {
   }
 
   public ClassificationResult findExistingClassification(SourceDocumentMetadata source) {
-    boolean exists =
-        ingestionDocumentRepository.existsBySubjectIdAndSourceBucketAndSourceObjectAndContentHash(
-            source.subjectId(), source.bucketName(), source.objectName(), source.contentHash());
-
-    if (exists) {
-      log.info("Found existing document for hash: {}", source.contentHash());
-      return new ClassificationResult();
-    }
+    // Check if document already exists - we don't skip, we'll update it
     return null;
   }
 
-  @Transactional
+  /**
+   * Deletes existing document within the same transaction as the caller. Use this when you want
+   * deletion to be part of a larger transaction.
+   */
+  private void deleteExistingDocumentIfPresent(SourceDocumentMetadata source) {
+    artifactRepository
+        .findBySubjectIdAndSourceBucketAndSourceObjectAndContentHash(
+            source.subjectId(), source.bucketName(), source.objectName(), source.contentHash())
+        .ifPresent(
+            artifact -> {
+              UUID artifactId = artifact.getArtifactId();
+
+              log.info(
+                  "Deleting existing document with artifactId: {} before re-ingestion", artifactId);
+
+              // Delete semantic chunks
+              semanticChunkRepository.deleteByArtifactId(artifactId);
+
+              // Delete ingestion documents
+              ingestionDocumentRepository.deleteByArtifactId(artifactId);
+
+              // Delete knowledge graph entities that have direct artifact_id foreign key
+              documentKnowledgeRepository.deleteByArtifactId(artifactId);
+              knowledgeComponentRepository.deleteByArtifactId(artifactId);
+              knowledgeAPIRepository.deleteByArtifactId(artifactId);
+              knowledgeBusinessRuleRepository.deleteByArtifactId(artifactId);
+              knowledgeWorkflowRepository.deleteByArtifactId(artifactId);
+              knowledgeDataModelRepository.deleteByArtifactId(artifactId);
+              knowledgeIntegrationRepository.deleteByArtifactId(artifactId);
+              knowledgeResourceRepository.deleteByArtifactId(artifactId);
+
+              // Note: Child entities (workflow_steps, data_fields, relationships) should be
+              // deleted by database CASCADE constraints on their parent foreign keys
+
+              // Delete artifact
+              artifactRepository.delete(artifact);
+
+              // Flush and clear to ensure deletes are executed before inserting new records
+              entityManager.flush();
+              entityManager.clear();
+
+              log.info("Deleted existing document and knowledge for artifact: {}", artifactId);
+            });
+  }
+
+  /**
+   * Deletes existing document in a separate transaction (REQUIRES_NEW). Use this when you need
+   * deletion to be independent of the caller's transaction.
+   */
+  @Transactional(propagation = Propagation.REQUIRES_NEW)
+  public void deleteExistingDocument(SourceDocumentMetadata source) {
+    deleteExistingDocumentIfPresent(source);
+  }
+
+  @Transactional(propagation = Propagation.REQUIRES_NEW)
   public UUID saveDocument(SourceDocumentMetadata source, List<SemanticChunk> chunks) {
-    UUID artifactId = saveArtifact(source);
+    // Check if artifact already exists - if so, update it instead of creating new one
+    Optional<ArtifactEntity> existingArtifactOpt =
+        artifactRepository.findBySubjectIdAndSourceBucketAndSourceObjectAndContentHash(
+            source.subjectId(), source.bucketName(), source.objectName(), source.contentHash());
+
+    UUID artifactId;
+    if (existingArtifactOpt.isPresent()) {
+      // Artifact exists - update it by deleting old data and inserting fresh data
+      artifactId = existingArtifactOpt.get().getArtifactId();
+      log.info(
+          "Artifact already exists for gs://{}/{}. Updating with fresh data. Artifact ID: {}",
+          source.bucketName(),
+          source.objectName(),
+          artifactId);
+
+      // Delete old chunks and documents (knowledge entities will be handled separately)
+      semanticChunkRepository.deleteByArtifactId(artifactId);
+      ingestionDocumentRepository.deleteByArtifactId(artifactId);
+
+      // Delete old knowledge entities
+      documentKnowledgeRepository.deleteByArtifactId(artifactId);
+      knowledgeComponentRepository.deleteByArtifactId(artifactId);
+      knowledgeAPIRepository.deleteByArtifactId(artifactId);
+      knowledgeBusinessRuleRepository.deleteByArtifactId(artifactId);
+      knowledgeWorkflowRepository.deleteByArtifactId(artifactId);
+      knowledgeDataModelRepository.deleteByArtifactId(artifactId);
+      knowledgeIntegrationRepository.deleteByArtifactId(artifactId);
+      knowledgeResourceRepository.deleteByArtifactId(artifactId);
+
+      // Update artifact metadata (entity is still managed)
+      ArtifactEntity artifact = existingArtifactOpt.get();
+      artifact.setUpdatedAt(java.time.OffsetDateTime.now());
+
+      // Flush to persist the artifact update and deletes, then clear the persistence context
+      // to avoid entity detachment issues when inserting new records
+      entityManager.flush();
+      entityManager.clear();
+
+    } else {
+      // Artifact doesn't exist - create new one
+      artifactId = saveArtifact(source);
+      log.info(
+          "Creating new artifact for gs://{}/{}. Artifact ID: {}",
+          source.bucketName(),
+          source.objectName(),
+          artifactId);
+    }
+
+    // Save fresh document and chunks
     UUID documentId = saveIngestionDocument(source, artifactId, chunks.size());
 
     for (int i = 0; i < chunks.size(); i++) {
@@ -81,6 +180,108 @@ public class PostgresStorageService {
         source.objectName());
 
     return artifactId;
+  }
+
+  @Transactional(propagation = Propagation.REQUIRES_NEW)
+  public UUID findExistingArtifactInNewTransaction(SourceDocumentMetadata source) {
+    return artifactRepository
+        .findBySubjectIdAndSourceBucketAndSourceObjectAndContentHash(
+            source.subjectId(), source.bucketName(), source.objectName(), source.contentHash())
+        .map(ArtifactEntity::getArtifactId)
+        .orElseThrow(
+            () ->
+                new IllegalStateException(
+                    "Failed to save document and couldn't find existing artifact"));
+  }
+
+  /**
+   * Cleans up duplicate artifacts for a subject (multiple copies of the same file). Keeps the most
+   * recent artifact for each unique combination of source_bucket + source_object + content_hash.
+   *
+   * @param subjectId the subject ID to clean up
+   * @return number of duplicate artifacts deleted
+   */
+  @Transactional
+  public int cleanupDuplicateArtifacts(UUID subjectId) {
+    log.info("Cleaning up duplicate artifacts for subject: {}", subjectId);
+
+    List<ArtifactEntity> artifacts = artifactRepository.findBySubjectId(subjectId);
+
+    if (artifacts.isEmpty()) {
+      log.info("No artifacts found for subject: {}", subjectId);
+      return 0;
+    }
+
+    // Group by source_bucket + source_object + content_hash to find true duplicates
+    java.util.Map<String, java.util.List<ArtifactEntity>> grouped =
+        artifacts.stream()
+            .collect(
+                java.util.stream.Collectors.groupingBy(
+                    a ->
+                        a.getSourceBucket()
+                            + "::"
+                            + a.getSourceObject()
+                            + "::"
+                            + a.getContentHash()));
+
+    int deletedCount = 0;
+
+    // Delete duplicate copies (keep most recent)
+    for (java.util.Map.Entry<String, java.util.List<ArtifactEntity>> entry : grouped.entrySet()) {
+      java.util.List<ArtifactEntity> dupes = entry.getValue();
+
+      if (dupes.size() > 1) {
+        // Sort by creation date descending, keep the most recent one
+        dupes.sort(java.util.Comparator.comparing(ArtifactEntity::getCreatedAt).reversed());
+
+        // Delete all but the first one (most recent)
+        for (int i = 1; i < dupes.size(); i++) {
+          ArtifactEntity toDelete = dupes.get(i);
+          UUID artifactId = toDelete.getArtifactId();
+
+          log.info(
+              "Deleting duplicate artifact: {} for file: {} (keeping newer version)",
+              artifactId,
+              toDelete.getSourceObject());
+
+          // Delete associated entities
+          semanticChunkRepository.deleteByArtifactId(artifactId);
+          ingestionDocumentRepository.deleteByArtifactId(artifactId);
+          documentKnowledgeRepository.deleteByArtifactId(artifactId);
+          knowledgeComponentRepository.deleteByArtifactId(artifactId);
+          knowledgeAPIRepository.deleteByArtifactId(artifactId);
+          knowledgeBusinessRuleRepository.deleteByArtifactId(artifactId);
+          knowledgeWorkflowRepository.deleteByArtifactId(artifactId);
+          knowledgeDataModelRepository.deleteByArtifactId(artifactId);
+          knowledgeIntegrationRepository.deleteByArtifactId(artifactId);
+          knowledgeResourceRepository.deleteByArtifactId(artifactId);
+
+          // Delete artifact
+          artifactRepository.delete(toDelete);
+
+          deletedCount++;
+
+          // Flush periodically
+          if (deletedCount % 10 == 0) {
+            entityManager.flush();
+            entityManager.clear();
+          }
+        }
+      }
+    }
+
+    // Final flush
+    if (deletedCount > 0) {
+      entityManager.flush();
+      entityManager.clear();
+    }
+
+    log.info(
+        "Cleanup completed. Deleted {} duplicate artifacts for subject: {}",
+        deletedCount,
+        subjectId);
+
+    return deletedCount;
   }
 
   private UUID saveArtifact(SourceDocumentMetadata source) {
@@ -112,7 +313,7 @@ public class PostgresStorageService {
       SourceDocumentMetadata source, UUID artifactId, int chunkCount) {
     IngestionDocumentEntity document =
         IngestionDocumentEntity.builder()
-            .documentId(UUID.randomUUID())
+            // Don't set documentId - let JPA generate it with @GeneratedValue
             .artifactId(artifactId)
             .subjectId(source.subjectId())
             .sourceBucket(source.bucketName())
@@ -210,18 +411,59 @@ public class PostgresStorageService {
         docKnowledge.getTechnologies() != null
             ? docKnowledge.getTechnologies().toArray(new String[0])
             : null;
+    String[] identifiedComponentsArray =
+        docKnowledge.getIdentifiedComponents() != null
+            ? docKnowledge.getIdentifiedComponents().toArray(new String[0])
+            : null;
+    String[] identifiedApisArray =
+        docKnowledge.getIdentifiedAPIs() != null
+            ? docKnowledge.getIdentifiedAPIs().toArray(new String[0])
+            : null;
+    String[] identifiedWorkflowsArray =
+        docKnowledge.getIdentifiedWorkflows() != null
+            ? docKnowledge.getIdentifiedWorkflows().toArray(new String[0])
+            : null;
+    String[] identifiedCapabilitiesArray =
+        docKnowledge.getIdentifiedCapabilities() != null
+            ? docKnowledge.getIdentifiedCapabilities().toArray(new String[0])
+            : null;
+    String[] identifiedRolesArray =
+        docKnowledge.getIdentifiedRoles() != null
+            ? docKnowledge.getIdentifiedRoles().toArray(new String[0])
+            : null;
+    String[] identifiedTermsArray =
+        docKnowledge.getIdentifiedTerms() != null
+            ? docKnowledge.getIdentifiedTerms().toArray(new String[0])
+            : null;
+    String[] identifiedPoliciesArray =
+        docKnowledge.getIdentifiedPolicies() != null
+            ? docKnowledge.getIdentifiedPolicies().toArray(new String[0])
+            : null;
+    String[] identifiedDecisionsArray =
+        docKnowledge.getIdentifiedDecisions() != null
+            ? docKnowledge.getIdentifiedDecisions().toArray(new String[0])
+            : null;
 
     DocumentKnowledgeEntity entity =
         DocumentKnowledgeEntity.builder()
             .artifactId(artifactId)
             .subjectId(subjectId)
             .title(docKnowledge.getSystemSummary())
-            .summary(docKnowledge.getOverallArchitecture())
+            .summary(docKnowledge.getSystemSummary())
+            .overallArchitecture(docKnowledge.getOverallArchitecture())
             .domain(docKnowledge.getDomain())
             .subdomain(docKnowledge.getSubdomain())
             .documentType(docKnowledge.getDetectedPlatform())
             .keyConcepts(keyConceptsArray)
             .technologies(technologiesArray)
+            .identifiedComponents(identifiedComponentsArray)
+            .identifiedApis(identifiedApisArray)
+            .identifiedWorkflows(identifiedWorkflowsArray)
+            .identifiedCapabilities(identifiedCapabilitiesArray)
+            .identifiedRoles(identifiedRolesArray)
+            .identifiedTerms(identifiedTermsArray)
+            .identifiedPolicies(identifiedPoliciesArray)
+            .identifiedDecisions(identifiedDecisionsArray)
             .extractedAt(java.time.OffsetDateTime.now())
             .build();
 
