@@ -10,8 +10,16 @@ import lombok.NoArgsConstructor;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
+/**
+ * Entity representing a parsed ingestion document.
+ *
+ * <p>Stores the raw parsed content and metadata extracted from source files during document
+ * processing. Serves as an intermediate representation before knowledge extraction.
+ *
+ * <p>Table: knowledge.ingestion_documents
+ */
 @Entity
-@Table(name = "ingestion_documents")
+@Table(name = "ingestion_documents", schema = "knowledge")
 @Data
 @Builder
 @NoArgsConstructor

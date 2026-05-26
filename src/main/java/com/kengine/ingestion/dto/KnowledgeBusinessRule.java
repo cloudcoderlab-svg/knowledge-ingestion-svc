@@ -21,5 +21,7 @@ public class KnowledgeBusinessRule {
   private String priority;
   private Double confidence;
   private List<Double> embedding;
+  private String technicalImplementation;
+  private String validationCriteria;
   private OffsetDateTime createdAt;
 }

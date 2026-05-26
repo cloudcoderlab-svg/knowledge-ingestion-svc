@@ -11,8 +11,18 @@ import lombok.NoArgsConstructor;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.Type;
 
+/**
+ * Entity representing a relationship between knowledge entities.
+ *
+ * <p>Stores directed edges in the knowledge graph connecting components, workflows, business rules,
+ * data models, and other entities. Relationships have types and optional metadata.
+ *
+ * <p>Table: knowledge.knowledge_relationships
+ *
+ * <p>Examples: "Component A depends on Component B", "Workflow X invokes API Y"
+ */
 @Entity
-@Table(name = "knowledge_relationships")
+@Table(name = "knowledge_relationships", schema = "knowledge")
 @Data
 @Builder
 @NoArgsConstructor
@@ -38,7 +48,7 @@ public class KnowledgeRelationshipEntity {
   @Column(name = "target_name", nullable = false)
   private String targetName;
 
-  @Column(name = "target_type", nullable = false)
+  @Column(name = "target_type")
   private String targetType;
 
   @Column(name = "target_ref_id", length = 36)

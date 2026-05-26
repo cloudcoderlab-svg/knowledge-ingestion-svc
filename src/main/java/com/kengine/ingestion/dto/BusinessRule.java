@@ -13,4 +13,6 @@ public class BusinessRule {
   private String sourceBusinessComponentName;
   private String priority;
   private Double confidence;
+  private String technicalImplementation;
+  private String validationCriteria;
 }

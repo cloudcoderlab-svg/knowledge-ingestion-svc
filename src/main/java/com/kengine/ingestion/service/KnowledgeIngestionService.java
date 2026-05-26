@@ -154,8 +154,10 @@ public class KnowledgeIngestionService {
     knowledgeGraphService.buildKnowledgeGraph(artifactId, source, docKnowledge, allChunkKnowledge);
     log.info("Knowledge graph build completed");
 
-    // Return classification from first chunk for backward compatibility
-    return chunks.get(0).getClassification();
+    // Return classification from first chunk with artifact ID for tracking
+    ClassificationResult result = chunks.get(0).getClassification();
+    result.setArtifactId(artifactId);
+    return result;
   }
 
   private SourceDocumentMetadata sourceMetadata(

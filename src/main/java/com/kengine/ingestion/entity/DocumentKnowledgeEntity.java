@@ -8,9 +8,18 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.UpdateTimestamp;
 
+/**
+ * Entity representing document-level knowledge summary.
+ *
+ * <p>Stores high-level summaries and metadata about processed documents, including key entities,
+ * topics, document type, and characteristics extracted during processing.
+ *
+ * <p>Table: knowledge.document_knowledge
+ */
 @Entity
-@Table(name = "document_knowledge")
+@Table(name = "document_knowledge", schema = "knowledge")
 @Data
 @Builder
 @NoArgsConstructor
@@ -85,4 +94,8 @@ public class DocumentKnowledgeEntity {
   @Column(name = "created_at")
   @CreationTimestamp
   private OffsetDateTime createdAt;
+
+  @Column(name = "updated_at")
+  @UpdateTimestamp
+  private OffsetDateTime updatedAt;
 }

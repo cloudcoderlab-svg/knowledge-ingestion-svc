@@ -2,14 +2,22 @@ package com.kengine.ingestion.service;
 
 import com.kengine.ingestion.dto.*;
 import com.kengine.ingestion.entity.DomainEntity;
+import com.kengine.ingestion.helper.EmbeddingUtils;
 import com.kengine.ingestion.repository.*;
 import java.util.List;
 import java.util.UUID;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+/**
+ * Service for performing vector similarity searches across different knowledge entities.
+ *
+ * <p>Supports semantic search on chunks, components, business rules, and workflows using embeddings
+ * and cosine similarity.
+ */
 @Service
 @RequiredArgsConstructor
 @Slf4j
@@ -25,97 +33,132 @@ public class VectorSearchService {
   private static final int DEFAULT_LIMIT = 10;
   private static final int MAX_LIMIT = 100;
 
+  /**
+   * Searches semantic chunks by vector similarity.
+   *
+   * @param subjectId Subject UUID
+   * @param request Search request with query or embedding
+   * @return Search response with ranked results
+   */
   public VectorSearchResponse<SemanticChunkSearchResult> searchSemanticChunks(
       UUID subjectId, VectorSearchRequest request) {
-    validateRequest(request);
-
-    String embeddingString = getEmbeddingString(request);
-    int limit = validateLimit(request.getLimit());
-
-    List<Object[]> results =
-        semanticChunkRepository.findSimilarByEmbedding(
-            subjectId, embeddingString, request.getSourceObject(), request.getDomain(), limit);
-
-    List<SearchResult<SemanticChunkSearchResult>> searchResults =
-        results.stream()
-            .map(this::mapToSemanticChunkSearchResult)
-            .filter(result -> filterByThreshold(result, request.getThreshold()))
-            .collect(Collectors.toList());
-
-    return buildResponse(
-        searchResults, request.hasQueryText() ? "text" : "embedding", "semantic_chunk");
+    return executeSearch(
+        request,
+        (embeddingString, limit) ->
+            semanticChunkRepository.findSimilarByEmbedding(
+                subjectId, embeddingString, request.getSourceObject(), request.getDomain(), limit),
+        this::mapToSemanticChunkSearchResult,
+        "semantic_chunk");
   }
 
+  /**
+   * Searches knowledge components by vector similarity.
+   *
+   * @param subjectId Subject UUID
+   * @param request Search request with query or embedding
+   * @return Search response with ranked results
+   */
   public VectorSearchResponse<ComponentSearchResult> searchComponents(
       UUID subjectId, VectorSearchRequest request) {
-    validateRequest(request);
-
-    String embeddingString = getEmbeddingString(request);
-    int limit = validateLimit(request.getLimit());
     UUID domainId = resolveDomainId(subjectId, request.getDomain());
-
-    List<Object[]> results =
-        knowledgeComponentRepository.findSimilarByEmbedding(
-            subjectId, embeddingString, domainId, limit);
-
-    List<SearchResult<ComponentSearchResult>> searchResults =
-        results.stream()
-            .map(this::mapToComponentSearchResult)
-            .filter(result -> filterByThreshold(result, request.getThreshold()))
-            .collect(Collectors.toList());
-
-    return buildResponse(searchResults, request.hasQueryText() ? "text" : "embedding", "component");
+    return executeSearch(
+        request,
+        (embeddingString, limit) ->
+            knowledgeComponentRepository.findSimilarByEmbedding(
+                subjectId, embeddingString, domainId, limit),
+        this::mapToComponentSearchResult,
+        "component");
   }
 
+  /**
+   * Searches business rules by vector similarity.
+   *
+   * @param subjectId Subject UUID
+   * @param request Search request with query or embedding
+   * @return Search response with ranked results
+   */
   public VectorSearchResponse<BusinessRuleSearchResult> searchBusinessRules(
       UUID subjectId, VectorSearchRequest request) {
-    validateRequest(request);
-
-    String embeddingString = getEmbeddingString(request);
-    int limit = validateLimit(request.getLimit());
     UUID domainId = resolveDomainId(subjectId, request.getDomain());
-
-    List<Object[]> results =
-        knowledgeBusinessRuleRepository.findSimilarByEmbedding(
-            subjectId, embeddingString, domainId, limit);
-
-    List<SearchResult<BusinessRuleSearchResult>> searchResults =
-        results.stream()
-            .map(this::mapToBusinessRuleSearchResult)
-            .filter(result -> filterByThreshold(result, request.getThreshold()))
-            .collect(Collectors.toList());
-
-    return buildResponse(
-        searchResults, request.hasQueryText() ? "text" : "embedding", "business_rule");
+    return executeSearch(
+        request,
+        (embeddingString, limit) ->
+            knowledgeBusinessRuleRepository.findSimilarByEmbedding(
+                subjectId, embeddingString, domainId, limit),
+        this::mapToBusinessRuleSearchResult,
+        "business_rule");
   }
 
+  /**
+   * Searches workflows by vector similarity.
+   *
+   * @param subjectId Subject UUID
+   * @param request Search request with query or embedding
+   * @return Search response with ranked results
+   */
   public VectorSearchResponse<WorkflowSearchResult> searchWorkflows(
       UUID subjectId, VectorSearchRequest request) {
+    UUID domainId = resolveDomainId(subjectId, request.getDomain());
+    return executeSearch(
+        request,
+        (embeddingString, limit) ->
+            knowledgeWorkflowRepository.findSimilarByEmbedding(
+                subjectId, embeddingString, domainId, limit),
+        this::mapToWorkflowSearchResult,
+        "workflow");
+  }
+
+  /**
+   * Generic search execution template that eliminates code duplication.
+   *
+   * @param request Search request
+   * @param repositoryQuery Function to execute repository query
+   * @param resultMapper Function to map Object[] to SearchResult
+   * @param entityType Type of entity being searched
+   * @return Search response with results
+   */
+  private <T> VectorSearchResponse<T> executeSearch(
+      VectorSearchRequest request,
+      RepositoryQuery repositoryQuery,
+      Function<Object[], SearchResult<T>> resultMapper,
+      String entityType) {
+
     validateRequest(request);
 
     String embeddingString = getEmbeddingString(request);
     int limit = validateLimit(request.getLimit());
-    UUID domainId = resolveDomainId(subjectId, request.getDomain());
 
-    List<Object[]> results =
-        knowledgeWorkflowRepository.findSimilarByEmbedding(
-            subjectId, embeddingString, domainId, limit);
+    List<Object[]> results = repositoryQuery.execute(embeddingString, limit);
 
-    List<SearchResult<WorkflowSearchResult>> searchResults =
+    List<SearchResult<T>> searchResults =
         results.stream()
-            .map(this::mapToWorkflowSearchResult)
+            .map(resultMapper)
             .filter(result -> filterByThreshold(result, request.getThreshold()))
             .collect(Collectors.toList());
 
-    return buildResponse(searchResults, request.hasQueryText() ? "text" : "embedding", "workflow");
+    return buildResponse(searchResults, request.hasQueryText() ? "text" : "embedding", entityType);
   }
 
+  /** Functional interface for repository query execution. */
+  @FunctionalInterface
+  private interface RepositoryQuery {
+    List<Object[]> execute(String embeddingString, int limit);
+  }
+
+  /** Validates that request contains exactly one of queryText or embedding. */
   private void validateRequest(VectorSearchRequest request) {
     if (!request.isValid()) {
       throw new IllegalArgumentException("Exactly one of queryText or embedding must be provided");
     }
   }
 
+  /**
+   * Resolves domain name to domain ID.
+   *
+   * @param subjectId Subject UUID
+   * @param domainName Domain name
+   * @return Domain UUID or null if not found
+   */
   private UUID resolveDomainId(UUID subjectId, String domainName) {
     if (domainName == null || domainName.isBlank()) {
       return null;
@@ -126,6 +169,12 @@ public class VectorSearchService {
         .orElse(null);
   }
 
+  /**
+   * Gets embedding string from request, generating from text if needed.
+   *
+   * @param request Search request
+   * @return Embedding as string
+   */
   private String getEmbeddingString(VectorSearchRequest request) {
     List<Double> embedding;
 
@@ -136,22 +185,15 @@ public class VectorSearchService {
       embedding = request.getEmbedding();
     }
 
-    return embeddingToString(embedding);
+    return EmbeddingUtils.embeddingToString(embedding);
   }
 
-  private String embeddingToString(List<Double> embedding) {
-    if (embedding == null || embedding.isEmpty()) {
-      return null;
-    }
-    StringBuilder sb = new StringBuilder("[");
-    for (int i = 0; i < embedding.size(); i++) {
-      if (i > 0) sb.append(",");
-      sb.append(embedding.get(i));
-    }
-    sb.append("]");
-    return sb.toString();
-  }
-
+  /**
+   * Validates and bounds the result limit.
+   *
+   * @param limit Requested limit
+   * @return Validated limit between 1 and MAX_LIMIT
+   */
   private int validateLimit(Integer limit) {
     if (limit == null) {
       return DEFAULT_LIMIT;
@@ -159,6 +201,13 @@ public class VectorSearchService {
     return Math.min(limit, MAX_LIMIT);
   }
 
+  /**
+   * Filters results by similarity threshold.
+   *
+   * @param result Search result
+   * @param threshold Minimum similarity score
+   * @return True if result passes threshold
+   */
   private boolean filterByThreshold(SearchResult<?> result, Double threshold) {
     if (threshold == null) {
       return true;
@@ -166,6 +215,7 @@ public class VectorSearchService {
     return result.getSimilarityScore() >= threshold;
   }
 
+  /** Maps database row to semantic chunk search result. */
   private SearchResult<SemanticChunkSearchResult> mapToSemanticChunkSearchResult(Object[] row) {
     int i = 0;
     SemanticChunkSearchResult result =
@@ -188,6 +238,7 @@ public class VectorSearchService {
         .build();
   }
 
+  /** Maps database row to component search result. */
   private SearchResult<ComponentSearchResult> mapToComponentSearchResult(Object[] row) {
     int i = 0;
     ComponentSearchResult result =
@@ -216,6 +267,7 @@ public class VectorSearchService {
         .build();
   }
 
+  /** Maps database row to business rule search result. */
   private SearchResult<BusinessRuleSearchResult> mapToBusinessRuleSearchResult(Object[] row) {
     int i = 0;
     BusinessRuleSearchResult result =
@@ -241,6 +293,7 @@ public class VectorSearchService {
         .build();
   }
 
+  /** Maps database row to workflow search result. */
   private SearchResult<WorkflowSearchResult> mapToWorkflowSearchResult(Object[] row) {
     int i = 0;
     WorkflowSearchResult result =
@@ -264,6 +317,14 @@ public class VectorSearchService {
         .build();
   }
 
+  /**
+   * Builds vector search response.
+   *
+   * @param results List of search results
+   * @param searchType Type of search ("text" or "embedding")
+   * @param entityType Type of entity searched
+   * @return Complete search response
+   */
   private <T> VectorSearchResponse<T> buildResponse(
       List<SearchResult<T>> results, String searchType, String entityType) {
     return VectorSearchResponse.<T>builder()

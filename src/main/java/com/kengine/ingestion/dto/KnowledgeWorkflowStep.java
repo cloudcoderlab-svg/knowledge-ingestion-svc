@@ -19,5 +19,8 @@ public class KnowledgeWorkflowStep {
   private String outputData;
   private String nextStep;
   private List<Double> embedding;
+  private String technicalDetails;
+  private String inputParameters;
+  private String outputParameters;
   private OffsetDateTime createdAt;
 }

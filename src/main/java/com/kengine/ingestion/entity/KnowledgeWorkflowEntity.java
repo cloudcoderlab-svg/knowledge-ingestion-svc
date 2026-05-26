@@ -11,8 +11,18 @@ import lombok.NoArgsConstructor;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.Type;
 
+/**
+ * Entity representing a business workflow or process.
+ *
+ * <p>Stores workflows, procedures, sequences of actions, and operational flows extracted from
+ * documentation. Includes trigger conditions, outcomes, and vector embeddings for semantic search.
+ *
+ * <p>Table: knowledge.knowledge_workflows
+ *
+ * <p>Examples: order processing workflow, user onboarding process, payment reconciliation
+ */
 @Entity
-@Table(name = "knowledge_workflows")
+@Table(name = "knowledge_workflows", schema = "knowledge")
 @Data
 @Builder
 @NoArgsConstructor

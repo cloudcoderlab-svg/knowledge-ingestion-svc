@@ -12,8 +12,18 @@ import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.annotations.UpdateTimestamp;
 import org.hibernate.type.SqlTypes;
 
+/**
+ * Entity representing a source document artifact.
+ *
+ * <p>Represents source documents stored in GCS that have been processed and ingested. Tracks
+ * metadata, content hash for deduplication, and processing status.
+ *
+ * <p>Table: knowledge.artifacts
+ *
+ * <p>Unique constraint: (subject_id, source_bucket, source_object, content_hash)
+ */
 @Entity
-@Table(name = "artifacts")
+@Table(name = "artifacts", schema = "knowledge")
 @Data
 @Builder
 @NoArgsConstructor

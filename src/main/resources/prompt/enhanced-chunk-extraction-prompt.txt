@@ -93,6 +93,8 @@ Return ONLY valid JSON using this exact shape:
       "exceptionHandling": "",
       "businessExamples": "",
       "affectsBusinessCapability": "Link to IDENTIFIED_CAPABILITIES",
+      "technicalImplementation": "Technical details: validation patterns/regex, API endpoints, service names, error codes, formulas, data transformations",
+      "validationCriteria": "Test scenarios: valid inputs with expected results, invalid inputs with expected errors",
       "confidence": 0.0
     }
   ],
@@ -120,7 +122,10 @@ Return ONLY valid JSON using this exact shape:
           "action": "",
           "input": "",
           "output": "",
-          "nextStep": ""
+          "nextStep": "",
+          "technicalDetails": "Technical implementation: service/API calls, database operations, transformations, error handling",
+          "inputParameters": "JSON string: {\"paramName\": {\"type\": \"...\", \"required\": true, \"description\": \"...\"}}",
+          "outputParameters": "JSON string: {\"resultName\": {\"type\": \"...\", \"description\": \"...\"}}"
         }
       ],
       "confidence": 0.0

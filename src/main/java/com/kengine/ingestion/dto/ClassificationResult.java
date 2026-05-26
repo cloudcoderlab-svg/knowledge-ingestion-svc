@@ -1,6 +1,7 @@
 package com.kengine.ingestion.dto;
 
 import java.util.List;
+import java.util.UUID;
 import lombok.Data;
 
 @Data
@@ -14,4 +15,5 @@ public class ClassificationResult {
   private List<String> integrationTypes;
   private Double confidence;
   private String summary;
+  private UUID artifactId; // Added for tracking ingested artifacts
 }

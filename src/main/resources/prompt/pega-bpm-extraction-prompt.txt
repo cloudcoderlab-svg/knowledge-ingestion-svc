@@ -137,7 +137,10 @@ Return ONLY valid JSON using this structure:
           "action": "From step description or purpose",
           "input": "From step input parameters",
           "output": "From step output or next action",
-          "nextStep": "From flow connector target"
+          "nextStep": "From flow connector target",
+          "technicalDetails": "Technical implementation: activities called, data transforms, connectors, decision shapes, error flows",
+          "inputParameters": "JSON string from step inputs: {\"paramName\": {\"type\": \"...\", \"description\": \"...\"}}",
+          "outputParameters": "JSON string from step outputs: {\"resultName\": {\"type\": \"...\", \"description\": \"...\"}}"
         }
       ],
       "confidence": 0.95
@@ -166,6 +169,8 @@ Return ONLY valid JSON using this structure:
       "businessImpact": "Impact if rule violated",
       "priority": "From rule priority",
       "ruleCategory": "validation|calculation|policy",
+      "technicalImplementation": "Technical details: decision table logic, validation expressions, activity methods, data transforms, error handling",
+      "validationCriteria": "Test scenarios: example conditions with expected results/actions",
       "confidence": 0.95
     }
   ],

@@ -12,8 +12,19 @@ import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.Type;
 import org.hibernate.annotations.UpdateTimestamp;
 
+/**
+ * Entity representing a semantic text chunk.
+ *
+ * <p>Stores segmented text chunks from documents with vector embeddings for semantic search. Each
+ * chunk represents a meaningful unit of text (paragraph, section, etc.) that can be searched using
+ * cosine similarity.
+ *
+ * <p>Table: knowledge.semantic_chunks
+ *
+ * <p>Supports vector similarity search using PostgreSQL pgvector extension.
+ */
 @Entity
-@Table(name = "semantic_chunks")
+@Table(name = "semantic_chunks", schema = "knowledge")
 @Data
 @Builder
 @NoArgsConstructor

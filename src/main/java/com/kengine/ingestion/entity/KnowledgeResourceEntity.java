@@ -14,8 +14,18 @@ import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.annotations.Type;
 import org.hibernate.type.SqlTypes;
 
+/**
+ * Entity representing an external resource or dependency.
+ *
+ * <p>Stores information about external resources, dependencies, libraries, frameworks, and tools
+ * mentioned in documentation.
+ *
+ * <p>Table: knowledge.knowledge_resources
+ *
+ * <p>Examples: npm packages, Maven dependencies, cloud services, third-party APIs
+ */
 @Entity
-@Table(name = "knowledge_resources")
+@Table(name = "knowledge_resources", schema = "knowledge")
 @Data
 @Builder
 @NoArgsConstructor
@@ -63,6 +73,10 @@ public class KnowledgeResourceEntity {
   @JdbcTypeCode(SqlTypes.JSON)
   @Column(name = "configs", columnDefinition = "jsonb")
   private Map<String, Object> configs;
+
+  @JdbcTypeCode(SqlTypes.JSON)
+  @Column(name = "metadata", columnDefinition = "jsonb")
+  private String metadata;
 
   @Column(name = "confidence")
   private Double confidence;

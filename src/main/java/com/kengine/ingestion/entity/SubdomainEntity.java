@@ -10,8 +10,18 @@ import lombok.NoArgsConstructor;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
+/**
+ * Entity representing a business subdomain.
+ *
+ * <p>Subdomains represent finer-grained business areas within a domain, creating a hierarchical
+ * organization of knowledge entities.
+ *
+ * <p>Table: knowledge.subdomains
+ *
+ * <p>Examples: Within "Payment Processing" domain: "Credit Card", "PayPal", "Bank Transfer"
+ */
 @Entity
-@Table(name = "subdomains")
+@Table(name = "subdomains", schema = "knowledge")
 @Data
 @Builder
 @NoArgsConstructor

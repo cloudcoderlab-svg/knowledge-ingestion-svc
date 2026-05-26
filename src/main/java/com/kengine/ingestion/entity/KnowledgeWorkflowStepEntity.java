@@ -9,10 +9,22 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.annotations.Type;
+import org.hibernate.type.SqlTypes;
 
+/**
+ * Entity representing a step within a workflow.
+ *
+ * <p>Stores individual steps or actions within a workflow. Each step has a sequence number,
+ * description, and optional metadata about actors, systems, or conditions.
+ *
+ * <p>Table: knowledge.knowledge_workflow_steps
+ *
+ * <p>Relationships: Many steps belong to one workflow
+ */
 @Entity
-@Table(name = "knowledge_workflow_steps")
+@Table(name = "knowledge_workflow_steps", schema = "knowledge")
 @Data
 @Builder
 @NoArgsConstructor
@@ -51,6 +63,17 @@ public class KnowledgeWorkflowStepEntity {
   @Column(name = "embedding")
   @Type(VectorType.class)
   private String embedding; // pgvector handled by custom UserType
+
+  @Column(name = "technical_details", columnDefinition = "text")
+  private String technicalDetails;
+
+  @JdbcTypeCode(SqlTypes.JSON)
+  @Column(name = "input_parameters", columnDefinition = "jsonb")
+  private String inputParameters;
+
+  @JdbcTypeCode(SqlTypes.JSON)
+  @Column(name = "output_parameters", columnDefinition = "jsonb")
+  private String outputParameters;
 
   @Column(name = "created_at")
   @CreationTimestamp

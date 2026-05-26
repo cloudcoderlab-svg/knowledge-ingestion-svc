@@ -1,5 +1,7 @@
 package com.kengine.ingestion.service;
 
+import com.kengine.ingestion.dto.ClassificationResult;
+import com.kengine.ingestion.entity.KnowledgeIngestionDocumentProcessEntity;
 import com.kengine.ingestion.entity.ProcessTrackingEntity;
 import com.kengine.ingestion.entity.SubjectEntity;
 import com.kengine.ingestion.model.ProcessStatus;
@@ -27,6 +29,7 @@ public class VirtualThreadProcessingService {
   private final SubjectRepository subjectRepository;
   private final PostgresStorageService storageService;
   private final CrossDocumentRelationshipService crossDocumentRelationshipService;
+  private final KnowledgeIngestionProcessService docProcessService;
 
   @Value("${gcp.storage.bucket-name}")
   private String bucketName;
@@ -68,13 +71,23 @@ public class VirtualThreadProcessingService {
                 processId,
                 ProcessStatus.FAILED,
                 "Processing orchestration failed: " + e.getMessage());
+
+            // Mark subject as FAILED
+            try {
+              ProcessTrackingEntity process = processTrackingService.getProcessEntity(processId);
+              updateSubjectStatus(
+                  process.getSubjectId(), com.kengine.ingestion.entity.SubjectStatus.FAILED);
+            } catch (Exception ex) {
+              log.error("Failed to update subject status for failed process: {}", processId, ex);
+            }
           }
         },
         virtualThreadExecutor);
   }
 
   /**
-   * Processes all files in a process concurrently using virtual threads.
+   * Processes all files in a process concurrently using virtual threads. Each document has its own
+   * tracking row to avoid optimistic lock conflicts.
    *
    * @param processId Process UUID
    */
@@ -84,10 +97,16 @@ public class VirtualThreadProcessingService {
     // Update status to IN_PROGRESS
     processTrackingService.updateStatus(processId, ProcessStatus.IN_PROGRESS, null);
 
+    // Update subject status to INGESTING
+    updateSubjectStatus(
+        process.getSubjectId(), com.kengine.ingestion.entity.SubjectStatus.INGESTING);
+
     List<String> files = process.getFileList();
     if (files == null || files.isEmpty()) {
       log.warn("No files to process for process: {}", processId);
       processTrackingService.updateStatus(processId, ProcessStatus.SUCCESS, null);
+      // Keep subject in DRAFT status when no files are uploaded
+      updateSubjectStatus(process.getSubjectId(), com.kengine.ingestion.entity.SubjectStatus.DRAFT);
       return;
     }
 
@@ -107,46 +126,98 @@ public class VirtualThreadProcessingService {
           "Error during duplicate cleanup: {}. Continuing with processing.", e.getMessage(), e);
     }
 
-    log.info("Starting sequential processing of {} files for process {}", files.size(), processId);
+    // STEP 2: Create document process tracking records for all files
+    log.info(
+        "[ParallelIngestion] Creating {} document process tracking records for process {}",
+        files.size(),
+        processId);
+    List<KnowledgeIngestionDocumentProcessEntity> docTrackings =
+        files.stream()
+            .map(
+                file ->
+                    docProcessService.createDocumentTracking(
+                        processId, process.getSubjectId(), file))
+            .toList();
 
-    // Track success/failure counts
-    int successCount = 0;
-    int failureCount = 0;
+    log.info(
+        "[ParallelIngestion] Starting PARALLEL processing of {} documents using virtual threads (process: {})",
+        files.size(),
+        processId);
 
-    // Process all files sequentially to avoid optimistic lock conflicts
-    for (String file : files) {
-      try {
-        log.info("Processing file: {} for process: {}", file, processId);
+    // STEP 3: Process all documents in parallel using virtual threads
+    List<CompletableFuture<Void>> futures =
+        docTrackings.stream()
+            .map(
+                docTracking ->
+                    CompletableFuture.runAsync(
+                        () -> processDocument(docTracking), virtualThreadExecutor))
+            .toList();
 
-        // Update current file
-        processTrackingService.updateProgress(processId, successCount, failureCount, file);
-
-        // Ingest the file
-        knowledgeIngestionService.ingestFromGcs(bucketName, file);
-
-        // Mark as success
-        successCount++;
-        processTrackingService.markFileProcessed(processId, file, true, null);
-
-        log.info(
-            "Successfully processed file: {} ({}/{} completed)",
-            file,
-            successCount + failureCount,
-            files.size());
-
-      } catch (Exception e) {
-        log.error("Failed to process file: {} - {}", file, e.getMessage(), e);
-
-        // Mark as failed
-        failureCount++;
-        processTrackingService.markFileProcessed(processId, file, false, e.getMessage());
-
-        log.warn("Failed to process file: {} ({} failures so far)", file, failureCount);
-      }
+    // STEP 4: Wait for all documents to complete
+    try {
+      CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).join();
+      log.info(
+          "[ParallelIngestion] All {} documents completed processing (process: {})",
+          files.size(),
+          processId);
+    } catch (Exception e) {
+      log.error("Error waiting for document processing to complete: {}", e.getMessage(), e);
     }
 
-    // Update final status after all files are processed
-    updateFinalStatus(processId, successCount, failureCount, null);
+    // STEP 5: Get final counts and update process status
+    long[] counts = docProcessService.getDocumentStatusCounts(processId);
+    long successCount = counts[0];
+    long failureCount = counts[1];
+
+    log.info(
+        "[ParallelIngestion] Process {} completed: {}/{} successful, {}/{} failed",
+        processId,
+        successCount,
+        files.size(),
+        failureCount,
+        files.size());
+
+    // Update final status
+    updateFinalStatus(processId, (int) successCount, (int) failureCount, null);
+  }
+
+  /**
+   * Processes a single document and updates its tracking status.
+   *
+   * @param docTracking the document tracking entity
+   */
+  private void processDocument(KnowledgeIngestionDocumentProcessEntity docTracking) {
+    UUID docProcessId = docTracking.getDocProcessId();
+    String filePath = docTracking.getFilePath();
+    String fileName = docTracking.getFileName();
+
+    try {
+      // Mark as started
+      docProcessService.markDocumentStarted(docProcessId);
+
+      log.info(
+          "[DocProcess] Processing document: {} (process: {}, doc_process_id: {})",
+          fileName,
+          docTracking.getProcessId(),
+          docProcessId);
+
+      // Ingest the document
+      ClassificationResult result = knowledgeIngestionService.ingestFromGcs(bucketName, filePath);
+      UUID artifactId = result.getArtifactId();
+
+      // Mark as success
+      docProcessService.markDocumentSuccess(docProcessId, artifactId);
+
+      log.info(
+          "[DocProcess] Successfully processed: {} (doc_process_id: {})", fileName, docProcessId);
+
+    } catch (Exception e) {
+      log.error(
+          "[DocProcess] Failed to process: {} (doc_process_id: {})", fileName, docProcessId, e);
+
+      // Mark as failed with error details
+      docProcessService.markDocumentFailed(docProcessId, e);
+    }
   }
 
   /**
@@ -160,13 +231,20 @@ public class VirtualThreadProcessingService {
   private void updateFinalStatus(
       UUID processId, int successCount, int failureCount, Throwable throwable) {
     try {
+      ProcessTrackingEntity process = processTrackingService.getProcessEntity(processId);
+      UUID subjectId = process.getSubjectId();
+
       if (throwable != null) {
         log.error("Processing completed with errors for process: {}", processId, throwable);
         processTrackingService.updateStatus(
             processId, ProcessStatus.FAILED, "Processing failed: " + throwable.getMessage());
+        // Mark subject as FAILED
+        updateSubjectStatus(subjectId, com.kengine.ingestion.entity.SubjectStatus.FAILED);
       } else if (failureCount > 0 && successCount == 0) {
         log.warn("All files failed for process: {}", processId);
         processTrackingService.updateStatus(processId, ProcessStatus.FAILED, "All files failed");
+        // Mark subject as FAILED
+        updateSubjectStatus(subjectId, com.kengine.ingestion.entity.SubjectStatus.FAILED);
       } else if (failureCount > 0) {
         log.warn(
             "Processing completed with partial failures for process: {} ({} success, {} failed)",
@@ -180,11 +258,17 @@ public class VirtualThreadProcessingService {
                 "Completed with %d failures out of %d files",
                 failureCount, successCount + failureCount));
 
+        // Mark subject as ACTIVE even with partial failures
+        updateSubjectStatus(subjectId, com.kengine.ingestion.entity.SubjectStatus.ACTIVE);
+
         // Trigger cross-document relationship analysis for successful ingestion
         triggerCrossDocumentAnalysis(processId);
       } else {
         log.info("Processing completed successfully for process: {}", processId);
         processTrackingService.updateStatus(processId, ProcessStatus.SUCCESS, null);
+
+        // Mark subject as ACTIVE
+        updateSubjectStatus(subjectId, com.kengine.ingestion.entity.SubjectStatus.ACTIVE);
 
         // Trigger cross-document relationship analysis after successful ingestion
         triggerCrossDocumentAnalysis(processId);
@@ -212,9 +296,10 @@ public class VirtualThreadProcessingService {
               .orElseThrow(() -> new IllegalArgumentException("Subject not found"));
 
       log.info(
-          "Triggering cross-document relationship analysis for subject: {} ({})",
+          "[CrossDocAnalysis] Triggering cross-document relationship analysis for subject: {} (subject_id: {}, process: {})",
           subject.getSubjectName(),
-          subjectId);
+          subjectId,
+          processId);
 
       // Run cross-document analysis asynchronously in a virtual thread
       CompletableFuture.runAsync(
@@ -223,12 +308,14 @@ public class VirtualThreadProcessingService {
               crossDocumentRelationshipService.analyzeAndInferRelationships(
                   subjectId, subject.getSubjectName());
               log.info(
-                  "Cross-document relationship analysis completed for subject: {}",
-                  subject.getSubjectName());
+                  "[CrossDocAnalysis] Completed for subject: {} (subject_id: {})",
+                  subject.getSubjectName(),
+                  subjectId);
             } catch (Exception e) {
               log.error(
-                  "Error during cross-document relationship analysis for subject: {}",
+                  "[CrossDocAnalysis] Failed for subject: {} (subject_id: {})",
                   subject.getSubjectName(),
+                  subjectId,
                   e);
             }
           },
@@ -237,6 +324,38 @@ public class VirtualThreadProcessingService {
     } catch (Exception e) {
       log.error(
           "Error triggering cross-document relationship analysis for process: {}", processId, e);
+    }
+  }
+
+  /**
+   * Gets the document processing status for a process.
+   *
+   * @param processId Process UUID
+   * @return List of document tracking entities
+   */
+  public List<KnowledgeIngestionDocumentProcessEntity> getDocumentStatus(UUID processId) {
+    return docProcessService.getDocumentTrackings(processId);
+  }
+
+  /**
+   * Updates the status of a subject.
+   *
+   * @param subjectId Subject UUID
+   * @param status New status
+   */
+  private void updateSubjectStatus(
+      UUID subjectId, com.kengine.ingestion.entity.SubjectStatus status) {
+    try {
+      SubjectEntity subject =
+          subjectRepository
+              .findById(subjectId)
+              .orElseThrow(() -> new IllegalArgumentException("Subject not found: " + subjectId));
+      subject.setStatus(status);
+      subjectRepository.save(subject);
+      log.info("Updated subject {} status to: {}", subjectId, status);
+    } catch (Exception e) {
+      log.error(
+          "Failed to update subject {} status to {}: {}", subjectId, status, e.getMessage(), e);
     }
   }
 }

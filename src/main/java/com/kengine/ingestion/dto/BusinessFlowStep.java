@@ -13,4 +13,7 @@ public class BusinessFlowStep {
   private String input;
   private String output;
   private String nextStep;
+  private String technicalDetails;
+  private String inputParameters;
+  private String outputParameters;
 }

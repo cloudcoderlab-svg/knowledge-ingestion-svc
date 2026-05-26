@@ -10,8 +10,18 @@ import lombok.NoArgsConstructor;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
+/**
+ * Entity representing a business domain.
+ *
+ * <p>Domains represent high-level business areas or functional domains within a subject's knowledge
+ * graph. Used to organize and categorize knowledge entities.
+ *
+ * <p>Table: knowledge.domains
+ *
+ * <p>Examples: "Order Management", "User Authentication", "Payment Processing"
+ */
 @Entity
-@Table(name = "domains")
+@Table(name = "domains", schema = "knowledge")
 @Data
 @Builder
 @NoArgsConstructor

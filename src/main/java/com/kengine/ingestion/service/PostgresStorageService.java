@@ -2,6 +2,7 @@ package com.kengine.ingestion.service;
 
 import com.kengine.ingestion.dto.*;
 import com.kengine.ingestion.entity.*;
+import com.kengine.ingestion.helper.EmbeddingUtils;
 import com.kengine.ingestion.repository.*;
 import jakarta.persistence.EntityManager;
 import java.util.List;
@@ -36,25 +37,6 @@ public class PostgresStorageService {
   private final KnowledgeResourceRepository knowledgeResourceRepository;
   private final KnowledgeRelationshipRepository knowledgeRelationshipRepository;
   private final EntityManager entityManager;
-
-  /**
-   * Converts a List<Double> embedding to pgvector string format: "[0.1, 0.2, 0.3]".
-   *
-   * @param embedding the embedding as a list of doubles
-   * @return the pgvector-formatted string, or null if embedding is null
-   */
-  private String embeddingToString(List<Double> embedding) {
-    if (embedding == null || embedding.isEmpty()) {
-      return null;
-    }
-    StringBuilder sb = new StringBuilder("[");
-    for (int i = 0; i < embedding.size(); i++) {
-      if (i > 0) sb.append(",");
-      sb.append(embedding.get(i));
-    }
-    sb.append("]");
-    return sb.toString();
-  }
 
   public ClassificationResult findExistingClassification(SourceDocumentMetadata source) {
     // Check if document already exists - we don't skip, we'll update it
@@ -355,7 +337,7 @@ public class PostgresStorageService {
             .subdomain(
                 chunk.getClassification() != null ? chunk.getClassification().getSubdomain() : null)
             .content(chunk.getContent())
-            .embedding(embeddingToString(chunk.getEmbedding()))
+            .embedding(EmbeddingUtils.embeddingToString(chunk.getEmbedding()))
             .build();
 
     semanticChunkRepository.save(chunkEntity); // Custom VectorType handles the conversion
@@ -488,7 +470,7 @@ public class PostgresStorageService {
             .owner(component.getOwner())
             .lifecycle(component.getLifecycle())
             .confidence(component.getConfidence())
-            .embedding(embeddingToString(component.getEmbedding()))
+            .embedding(EmbeddingUtils.embeddingToString(component.getEmbedding()))
             .metadata(component.getMetadata())
             .build();
 
@@ -510,7 +492,7 @@ public class PostgresStorageService {
             .requestSchema(api.getRequestSchema())
             .responseSchema(api.getResponseSchema())
             .authentication(api.getAuthentication())
-            .embedding(embeddingToString(api.getEmbedding()))
+            .embedding(EmbeddingUtils.embeddingToString(api.getEmbedding()))
             .build();
 
     return knowledgeAPIRepository.save(entity).getApiId();
@@ -530,7 +512,9 @@ public class PostgresStorageService {
             .outcomeText(rule.getOutcomeText())
             .priority(rule.getPriority())
             .confidence(rule.getConfidence())
-            .embedding(embeddingToString(rule.getEmbedding()))
+            .embedding(EmbeddingUtils.embeddingToString(rule.getEmbedding()))
+            .technicalImplementation(rule.getTechnicalImplementation())
+            .validationCriteria(rule.getValidationCriteria())
             .build();
 
     return knowledgeBusinessRuleRepository.save(entity).getRuleId();
@@ -548,7 +532,7 @@ public class PostgresStorageService {
             .outcomeText(workflow.getOutcomeText())
             .owner(workflow.getOwner())
             .confidence(workflow.getConfidence())
-            .embedding(embeddingToString(workflow.getEmbedding()))
+            .embedding(EmbeddingUtils.embeddingToString(workflow.getEmbedding()))
             .build();
 
     return knowledgeWorkflowRepository.save(entity).getWorkflowId();
@@ -566,7 +550,10 @@ public class PostgresStorageService {
             .inputData(step.getInputData())
             .outputData(step.getOutputData())
             .nextStep(step.getNextStep())
-            .embedding(embeddingToString(step.getEmbedding()))
+            .embedding(EmbeddingUtils.embeddingToString(step.getEmbedding()))
+            .technicalDetails(step.getTechnicalDetails())
+            .inputParameters(step.getInputParameters())
+            .outputParameters(step.getOutputParameters())
             .build();
 
     return knowledgeWorkflowStepRepository.save(entity).getStepId();
@@ -583,7 +570,7 @@ public class PostgresStorageService {
             .modelType(dataModel.getModelType())
             .description(dataModel.getDescription())
             .schemaDefinition(dataModel.getSchemaDefinition())
-            .embedding(embeddingToString(dataModel.getEmbedding()))
+            .embedding(EmbeddingUtils.embeddingToString(dataModel.getEmbedding()))
             .build();
 
     return knowledgeDataModelRepository.save(entity).getDataModelId();
@@ -617,7 +604,7 @@ public class PostgresStorageService {
             .targetSystem(integration.getTargetSystem())
             .protocol(integration.getProtocol())
             .description(integration.getDescription())
-            .embedding(embeddingToString(integration.getEmbedding()))
+            .embedding(EmbeddingUtils.embeddingToString(integration.getEmbedding()))
             .build();
 
     return knowledgeIntegrationRepository.save(entity).getIntegrationId();
@@ -640,7 +627,7 @@ public class PostgresStorageService {
             .lifecycle(resource.getLifecycle())
             .configs(resource.getConfigs())
             .confidence(resource.getConfidence())
-            .embedding(embeddingToString(resource.getEmbedding()))
+            .embedding(EmbeddingUtils.embeddingToString(resource.getEmbedding()))
             .build();
 
     return knowledgeResourceRepository.save(entity).getResourceId();

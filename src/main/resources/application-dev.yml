@@ -1,39 +1,74 @@
-# Development-specific configuration overrides
-# This file only contains properties that differ from application.yml
+# Development Profile Configuration
 
-logging:
-  level:
-    liquibase: DEBUG
-    org.springframework.boot.autoconfigure: DEBUG
-    org.springframework.jdbc.datasource: DEBUG
-    com.kengine.ingestion: DEBUG
+server:
+  port: 8086
 
 spring:
   datasource:
-    url: jdbc:postgresql://${KENGINE_DB_HOST:10.196.140.215}:${KENGINE_DB_PORT:5432}/${KENGINE_DB_NAME:kengine-db}
-    username: ${KENGINE_DB_USER:kengine_app}
-    password: ${KENGINE_DB_PASSWORD:Admin@123}
+    url: jdbc:postgresql://10.196.140.215:5432/kengine-db
+    username: kengine_app
+    password: Admin@123
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 5
+      connection-timeout: 30000
   jpa:
-    show-sql: true
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
+    hibernate:
+      ddl-auto: none  # Liquibase manages schema
+    show-sql: true  # Enable SQL logging in dev
+    open-in-view: false
     properties:
       hibernate:
         format_sql: true
-        default_schema: knowledge
+        use_sql_comments: true  # Enable SQL comments in dev
         jdbc:
-          batch_size: 20
+          batch_size: 50
+          fetch_size: 50
+        order_inserts: true
+        order_updates: true
   liquibase:
+    # Use consolidated schema with idempotent IF NOT EXISTS clauses
+    change-log: classpath:/db/changelog/changelog-master.xml
+    liquibase-schema: public
+    default-schema: knowledge
+    # Idempotent configuration - safe to run multiple times
+    drop-first: false  # Set to true to drop and recreate schema on startup (DANGER!)
     enabled: true
-    change-log: classpath:/db/changelog/db.changelog-master.xml
-    drop-first: false
 
-cloudsql:
-  instance-id: gpc-d-disc-postgresdb
-  user: kengine_app
-
+# Development settings
 gcp:
   project-id: gpc-d-disc
   storage:
-    bucket-name: ${GCS_BUCKET_NAME:kengine-knowledge-artifacts}
+    bucket-name: kengine-knowledge-artifacts
 
 vertex:
   project-id: gpc-d-disc
+  location: us-central1
+  classification-model-name: gemini-2.5-flash
+  embedding-model-name: text-embedding-005
+
+ingestion:
+  chunk:
+    max-chars: 3000
+    overlap-chars: 300
+  parser:
+    multimodal-types: pdf,png,jpg,jpeg,docx,pptx
+    use-multimodal: true
+    max-document-size-mb: 50
+  extraction:
+    enable-document-level-analysis: true
+    enable-entity-embeddings: true
+  knowledge-graph:
+    enable-persistence: true
+    batch-size: 100
+
+# Development logging
+logging:
+  level:
+    root: INFO
+    com.kengine: DEBUG
+    org.springframework.web: DEBUG
+    org.hibernate.SQL: DEBUG
+    org.hibernate.type.descriptor.sql.BasicBinder: TRACE
+    liquibase: DEBUG

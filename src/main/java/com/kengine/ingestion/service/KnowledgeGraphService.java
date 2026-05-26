@@ -6,6 +6,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.function.Consumer;
+import java.util.function.Function;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -222,11 +224,59 @@ public class KnowledgeGraphService {
     return components;
   }
 
+  /**
+   * Generic template method for saving knowledge entities.
+   *
+   * <p>Eliminates code duplication across save methods by providing a reusable pattern for:
+   *
+   * <ul>
+   *   <li>Iterating over entities
+   *   <li>Optional embedding generation
+   *   <li>Saving to storage
+   *   <li>Error handling and logging
+   * </ul>
+   *
+   * @param <T> Type of entity being saved
+   * @param entities List of entities to save
+   * @param entityName Human-readable name for logging (e.g., "component", "business rule")
+   * @param embeddingGenerator Optional function to generate embedding (null if not needed)
+   * @param entitySaver Function to save entity and return its ID
+   * @param entityNameExtractor Function to extract entity name for error logging
+   */
+  private <T> void saveEntities(
+      List<T> entities,
+      String entityName,
+      Consumer<T> embeddingGenerator,
+      Function<T, UUID> entitySaver,
+      Function<T, String> entityNameExtractor) {
+
+    for (T entity : entities) {
+      try {
+        // Generate embedding if generator provided
+        if (embeddingGenerator != null) {
+          embeddingGenerator.accept(entity);
+        }
+
+        // Save entity
+        entitySaver.apply(entity);
+
+      } catch (Exception e) {
+        String name = entityNameExtractor != null ? entityNameExtractor.apply(entity) : "unknown";
+        log.error("Failed to save {}: {}", entityName, name, e);
+      }
+    }
+
+    log.info("Saved {} {}{}", entities.size(), entityName, entities.size() != 1 ? "s" : "");
+  }
+
   private Map<String, UUID> saveComponents(List<KnowledgeComponent> components) {
     Map<String, UUID> nameToId = new HashMap<>();
 
     for (KnowledgeComponent component : components) {
       try {
+        // Generate embedding
+        component.setEmbedding(embeddingService.embedComponent(component));
+
         UUID componentId = storageService.saveKnowledgeComponent(component);
         nameToId.put(component.getComponentName(), componentId);
       } catch (Exception e) {
@@ -267,6 +317,8 @@ public class KnowledgeGraphService {
                           .outcomeText(br.getOutcome())
                           .priority(br.getPriority())
                           .confidence(br.getConfidence())
+                          .technicalImplementation(br.getTechnicalImplementation())
+                          .validationCriteria(br.getValidationCriteria())
                           .build();
 
                   rules.add(rule);
@@ -278,15 +330,15 @@ public class KnowledgeGraphService {
   }
 
   private void saveBusinessRules(List<KnowledgeBusinessRule> rules) {
-    for (KnowledgeBusinessRule rule : rules) {
-      try {
-        rule.setEmbedding(embeddingService.embedBusinessRule(rule));
-        storageService.saveKnowledgeBusinessRule(rule);
-      } catch (Exception e) {
-        log.error("Failed to save business rule: {}", rule.getRuleName(), e);
-      }
-    }
-    log.info("Saved {} business rules", rules.size());
+    saveEntities(
+        rules,
+        "business rule",
+        rule -> rule.setEmbedding(embeddingService.embedBusinessRule(rule)),
+        rule -> {
+          storageService.saveKnowledgeBusinessRule(rule);
+          return null; // Business rules don't return ID in this context
+        },
+        KnowledgeBusinessRule::getRuleName);
   }
 
   private List<KnowledgeWorkflow> extractWorkflows(
@@ -318,6 +370,9 @@ public class KnowledgeGraphService {
                                       .inputData(step.getInput())
                                       .outputData(step.getOutput())
                                       .nextStep(step.getNextStep())
+                                      .technicalDetails(step.getTechnicalDetails())
+                                      .inputParameters(step.getInputParameters())
+                                      .outputParameters(step.getOutputParameters())
                                       .build();
                               steps.add(workflowStep);
                             });
@@ -347,22 +402,42 @@ public class KnowledgeGraphService {
   private void saveWorkflows(List<KnowledgeWorkflow> workflows) {
     for (KnowledgeWorkflow workflow : workflows) {
       try {
+        // Generate workflow embedding
         workflow.setEmbedding(embeddingService.embedWorkflow(workflow));
+
+        // Save workflow and get ID
         UUID workflowId = storageService.saveKnowledgeWorkflow(workflow);
 
-        // Save workflow steps
+        // Save workflow steps if present
         if (workflow.getSteps() != null) {
-          for (KnowledgeWorkflowStep step : workflow.getSteps()) {
-            step.setWorkflowId(workflowId);
-            step.setEmbedding(embeddingService.embedWorkflowStep(step));
-            storageService.saveKnowledgeWorkflowStep(step);
-          }
+          saveWorkflowSteps(workflowId, workflow.getSteps());
         }
       } catch (Exception e) {
         log.error("Failed to save workflow: {}", workflow.getWorkflowName(), e);
       }
     }
     log.info("Saved {} workflows", workflows.size());
+  }
+
+  /**
+   * Saves workflow steps for a workflow.
+   *
+   * @param workflowId UUID of the parent workflow
+   * @param steps List of workflow steps to save
+   */
+  private void saveWorkflowSteps(UUID workflowId, List<KnowledgeWorkflowStep> steps) {
+    saveEntities(
+        steps,
+        "workflow step",
+        step -> {
+          step.setWorkflowId(workflowId);
+          step.setEmbedding(embeddingService.embedWorkflowStep(step));
+        },
+        step -> {
+          storageService.saveKnowledgeWorkflowStep(step);
+          return null;
+        },
+        KnowledgeWorkflowStep::getStepName);
   }
 
   private List<KnowledgeResource> extractResources(
@@ -414,15 +489,15 @@ public class KnowledgeGraphService {
   }
 
   private void saveResources(List<KnowledgeResource> resources) {
-    for (KnowledgeResource resource : resources) {
-      try {
-        resource.setEmbedding(embeddingService.embedResource(resource));
-        storageService.saveKnowledgeResource(resource);
-      } catch (Exception e) {
-        log.error("Failed to save resource: {}", resource.getResourceName(), e);
-      }
-    }
-    log.info("Saved {} resources", resources.size());
+    saveEntities(
+        resources,
+        "resource",
+        resource -> resource.setEmbedding(embeddingService.embedResource(resource)),
+        resource -> {
+          storageService.saveKnowledgeResource(resource);
+          return null;
+        },
+        KnowledgeResource::getResourceName);
   }
 
   private List<KnowledgeRelationship> extractRelationships(
@@ -443,17 +518,14 @@ public class KnowledgeGraphService {
 
   private void saveRelationships(
       UUID artifactId, SourceDocumentMetadata source, List<KnowledgeRelationship> relationships) {
-    for (KnowledgeRelationship relationship : relationships) {
-      try {
-        storageService.saveKnowledgeRelationship(artifactId, source.subjectId(), relationship);
-      } catch (Exception e) {
-        log.error(
-            "Failed to save relationship: {} -> {}",
-            relationship.getSourceName(),
-            relationship.getTargetName(),
-            e);
-      }
-    }
-    log.info("Saved {} relationships", relationships.size());
+    saveEntities(
+        relationships,
+        "relationship",
+        null, // No embedding generation for relationships
+        relationship -> {
+          storageService.saveKnowledgeRelationship(artifactId, source.subjectId(), relationship);
+          return null;
+        },
+        rel -> rel.getSourceName() + " -> " + rel.getTargetName());
   }
 }

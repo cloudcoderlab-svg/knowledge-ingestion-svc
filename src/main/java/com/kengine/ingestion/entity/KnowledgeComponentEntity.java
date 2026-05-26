@@ -15,8 +15,18 @@ import org.hibernate.annotations.Type;
 import org.hibernate.annotations.UpdateTimestamp;
 import org.hibernate.type.SqlTypes;
 
+/**
+ * Entity representing an architectural component.
+ *
+ * <p>Stores information about system building blocks such as services, libraries, databases, APIs,
+ * and other architectural elements extracted from documentation.
+ *
+ * <p>Table: knowledge.knowledge_components
+ *
+ * <p>Includes vector embeddings for semantic similarity search of components.
+ */
 @Entity
-@Table(name = "knowledge_components")
+@Table(name = "knowledge_components", schema = "knowledge")
 @Data
 @Builder
 @NoArgsConstructor

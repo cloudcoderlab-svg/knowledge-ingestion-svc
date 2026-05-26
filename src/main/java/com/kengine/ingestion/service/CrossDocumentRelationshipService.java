@@ -43,7 +43,10 @@ public class CrossDocumentRelationshipService {
   public CrossDocumentAnalysisResult analyzeAndInferRelationships(
       UUID subjectId, String subjectName) {
 
-    log.info("Starting cross-document relationship analysis for subject: {}", subjectName);
+    log.info(
+        "[CrossDocAnalysis] Starting analysis for subject: {} (subject_id: {})",
+        subjectName,
+        subjectId);
 
     // Retrieve all document knowledge for this subject
     List<DocumentKnowledgeEntity> documents =
@@ -51,16 +54,17 @@ public class CrossDocumentRelationshipService {
 
     if (documents == null || documents.size() < 2) {
       log.info(
-          "Skipping cross-document analysis: subject {} has {} documents (need at least 2)",
+          "[CrossDocAnalysis] Skipping - subject {} has {} documents (need at least 2)",
           subjectName,
           documents != null ? documents.size() : 0);
       return CrossDocumentAnalysisResult.builder().build();
     }
 
     log.info(
-        "Found {} documents for subject {}. Performing cross-document analysis.",
+        "[CrossDocAnalysis] Analyzing {} documents for subject: {} (subject_id: {})",
         documents.size(),
-        subjectName);
+        subjectName,
+        subjectId);
 
     try {
       // Load the cross-document relationship prompt
@@ -186,21 +190,31 @@ public class CrossDocumentRelationshipService {
             savedCount++;
           }
         }
-        log.info("Saved {} cross-document relationships for subject {}", savedCount, subjectName);
+        log.info(
+            "[CrossDocAnalysis] Saved {} cross-document relationships for subject: {} (subject_id: {})",
+            savedCount,
+            subjectName,
+            subjectId);
       }
 
       // Log insights
       if (result.getCrossDocumentInsights() != null
           && result.getCrossDocumentInsights().getSharedEntities() != null) {
         log.info(
-            "Identified {} shared entities across documents",
-            result.getCrossDocumentInsights().getSharedEntities().size());
+            "[CrossDocAnalysis] Identified {} shared entities across {} documents for subject: {}",
+            result.getCrossDocumentInsights().getSharedEntities().size(),
+            documents.size(),
+            subjectName);
       }
 
       return result;
 
     } catch (Exception e) {
-      log.error("Error during cross-document relationship analysis for subject {}", subjectName, e);
+      log.error(
+          "[CrossDocAnalysis] Error during analysis for subject: {} (subject_id: {})",
+          subjectName,
+          subjectId,
+          e);
       return CrossDocumentAnalysisResult.builder().build();
     }
   }

@@ -14,8 +14,16 @@ import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.annotations.Type;
 import org.hibernate.type.SqlTypes;
 
+/**
+ * Entity representing an API endpoint or integration point.
+ *
+ * <p>Stores information about REST APIs, endpoints, and integration points extracted from
+ * documentation, including HTTP methods, paths, request/response formats, and authentication.
+ *
+ * <p>Table: knowledge.knowledge_apis
+ */
 @Entity
-@Table(name = "knowledge_apis")
+@Table(name = "knowledge_apis", schema = "knowledge")
 @Data
 @Builder
 @NoArgsConstructor
@@ -45,7 +53,7 @@ public class KnowledgeAPIEntity {
   @Column(name = "http_method", length = 10)
   private String httpMethod;
 
-  @Column(name = "endpoint_path", length = 2000)
+  @Column(name = "endpoint_path", length = 2048)
   private String endpointPath;
 
   @Column(name = "description", columnDefinition = "text")
@@ -59,8 +67,12 @@ public class KnowledgeAPIEntity {
   @Column(name = "response_schema", columnDefinition = "jsonb")
   private Map<String, Object> responseSchema;
 
-  @Column(name = "authentication", length = 100)
+  @Column(name = "authentication", length = 255)
   private String authentication;
+
+  @JdbcTypeCode(SqlTypes.JSON)
+  @Column(name = "metadata", columnDefinition = "jsonb")
+  private String metadata;
 
   @Column(name = "embedding")
   @Type(VectorType.class)

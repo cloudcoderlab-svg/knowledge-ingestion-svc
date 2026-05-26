@@ -14,8 +14,18 @@ import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.annotations.Type;
 import org.hibernate.type.SqlTypes;
 
+/**
+ * Entity representing a data model or schema.
+ *
+ * <p>Stores information about database schemas, entities, tables, and data structures extracted
+ * from documentation. Contains metadata about the model and relationships to data fields.
+ *
+ * <p>Table: knowledge.knowledge_data_models
+ *
+ * <p>Examples: User table, Order entity, Payment schema
+ */
 @Entity
-@Table(name = "knowledge_data_models")
+@Table(name = "knowledge_data_models", schema = "knowledge")
 @Data
 @Builder
 @NoArgsConstructor

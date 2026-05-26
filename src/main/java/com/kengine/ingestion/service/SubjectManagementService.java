@@ -4,6 +4,7 @@ import com.kengine.ingestion.dto.CreateSubjectRequest;
 import com.kengine.ingestion.dto.SignedUrlResponse;
 import com.kengine.ingestion.dto.SubjectResponse;
 import com.kengine.ingestion.entity.SubjectEntity;
+import com.kengine.ingestion.entity.SubjectStatus;
 import com.kengine.ingestion.repository.SubjectRepository;
 import java.util.List;
 import java.util.UUID;
@@ -40,15 +41,23 @@ public class SubjectManagementService {
             ? normalizeToKebabCase(request.getSubjectName())
             : normalizeToKebabCase(request.getTitle());
 
-    // Check if subject name already exists
+    // Determine version number
+    int version = 1;
     if (subjectRepository.existsBySubjectName(subjectName)) {
-      throw new IllegalArgumentException("Subject with name '" + subjectName + "' already exists");
+      // Subject name exists, find the latest version and increment
+      List<SubjectEntity> existingVersions =
+          subjectRepository.findBySubjectNameOrderByUpdatedAtDesc(subjectName);
+      if (!existingVersions.isEmpty()) {
+        version = existingVersions.stream().mapToInt(SubjectEntity::getVersion).max().orElse(0) + 1;
+        log.info("Subject '{}' already exists. Creating new version: {}", subjectName, version);
+      }
     }
 
     // Create subject entity
     SubjectEntity subject =
         SubjectEntity.builder()
             .subjectName(subjectName)
+            .version(version)
             .title(request.getTitle())
             .description(request.getDescription())
             .sourceBucket(bucketName)
@@ -73,17 +82,23 @@ public class SubjectManagementService {
     // Save updated entity with GCS folder URL
     subject = subjectRepository.save(subject);
 
-    log.info("Created subject: {} with ID: {}", subjectName, subject.getSubjectId());
+    log.info(
+        "Created subject: {} (version {}) with ID: {}",
+        subjectName,
+        subject.getVersion(),
+        subject.getSubjectId());
 
     // Build response
     return SubjectResponse.builder()
         .subjectId(subject.getSubjectId())
         .subjectName(subject.getSubjectName())
+        .version(subject.getVersion())
         .title(subject.getTitle())
         .description(subject.getDescription())
         .sourceBucket(subject.getSourceBucket())
         .gcsFolderUrl(subject.getGcsFolderUrl())
         .definitionUrl("gs://" + bucketName + "/" + definitionPath)
+        .status(subject.getStatus())
         .createdAt(subject.getCreatedAt())
         .updatedAt(subject.getUpdatedAt())
         .build();
@@ -184,15 +199,61 @@ public class SubjectManagementService {
     return SubjectResponse.builder()
         .subjectId(subject.getSubjectId())
         .subjectName(subject.getSubjectName())
+        .version(subject.getVersion())
         .title(subject.getTitle())
         .description(subject.getDescription())
         .sourceBucket(subject.getSourceBucket())
         .gcsFolderUrl(subject.getGcsFolderUrl())
         .definitionUrl(
             "gs://" + bucketName + "/subjects/" + subject.getSubjectName() + "/definition.md")
+        .status(subject.getStatus())
         .createdAt(subject.getCreatedAt())
         .updatedAt(subject.getUpdatedAt())
         .build();
+  }
+
+  /**
+   * Validates that a subject is ACTIVE and ready for knowledge queries.
+   *
+   * <p>Always checks the LATEST version of the subject based on updated timestamp. This ensures
+   * that even if querying an older version by ID, validation is performed against the most recent
+   * version.
+   *
+   * @param subjectId Subject UUID
+   * @throws IllegalStateException if the latest version of the subject is not ACTIVE
+   */
+  public void validateSubjectIsActive(UUID subjectId) {
+    // First get the subject to retrieve its name
+    SubjectEntity requestedSubject =
+        subjectRepository
+            .findById(subjectId)
+            .orElseThrow(() -> new IllegalArgumentException("Subject not found: " + subjectId));
+
+    // Then find the latest version of this subject by name
+    SubjectEntity latestVersion =
+        subjectRepository
+            .findLatestVersionBySubjectId(subjectId)
+            .orElseThrow(
+                () ->
+                    new IllegalArgumentException(
+                        "Latest version not found for subject: " + subjectId));
+
+    if (latestVersion.getStatus() != SubjectStatus.ACTIVE) {
+      throw new IllegalStateException(
+          String.format(
+              "Subject '%s' (version %d, latest) is not ready for knowledge queries. Current status: %s. "
+                  + "Only ACTIVE subjects can be queried. Please wait for ingestion to complete.",
+              latestVersion.getSubjectName(),
+              latestVersion.getVersion(),
+              latestVersion.getStatus()));
+    }
+
+    log.debug(
+        "Subject validation passed: {} (requested: v{}, latest: v{}, status: {})",
+        latestVersion.getSubjectName(),
+        requestedSubject.getVersion(),
+        latestVersion.getVersion(),
+        latestVersion.getStatus());
   }
 
   /**

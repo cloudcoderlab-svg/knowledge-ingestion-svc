@@ -129,7 +129,10 @@ Return ONLY valid JSON using this structure:
           "action": "From <bpmn:documentation> or task name",
           "input": "From <camunda:inputParameter> or dataInputAssociation",
           "output": "From <camunda:outputParameter> or dataOutputAssociation",
-          "nextStep": "From <bpmn:sequenceFlow targetRef='...'>"
+          "nextStep": "From <bpmn:sequenceFlow targetRef='...'>",
+          "technicalDetails": "Technical implementation: service task class names, delegates, REST connectors, script language, error events",
+          "inputParameters": "JSON string from <camunda:inputParameter>: {\"varName\": {\"type\": \"String\", \"description\": \"...\"}}",
+          "outputParameters": "JSON string from <camunda:outputParameter>: {\"resultVar\": {\"type\": \"Boolean\", \"description\": \"...\"}}"
         }
       ],
       "confidence": 0.95
@@ -168,6 +171,8 @@ Return ONLY valid JSON using this structure:
       "outcome": "What happens when rule is applied",
       "businessRationale": "From <bpmn:documentation>",
       "ruleCategory": "workflow",
+      "technicalImplementation": "Technical details: DMN decision tables, expression language (JUEL/Groovy), service references, error handling",
+      "validationCriteria": "Test scenarios: example inputs with expected decision outcomes",
       "confidence": 0.95
     }
   ],

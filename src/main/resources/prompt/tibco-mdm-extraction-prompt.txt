@@ -70,6 +70,16 @@ Known Business Terms: {{IDENTIFIED_TERMS}}
    - Extract error messages into businessImpact
    - Use <Priority> for priority field
    - Extract <BusinessRationale> if present
+   - **NEW: technicalImplementation** - Extract technical details:
+     * Validation regex patterns, formats, constraints
+     * Service or API names that perform validation
+     * Error codes and error message templates
+     * Data type constraints, range validations
+     * Calculation formulas with actual syntax
+   - **NEW: validationCriteria** - Create test scenarios:
+     * Example valid inputs and expected results
+     * Example invalid inputs and expected error codes/messages
+     * Edge cases and boundary conditions
 
 4. **Relationships:**
    - Extract ALL <Relationship> elements
@@ -82,6 +92,10 @@ Known Business Terms: {{IDENTIFIED_TERMS}}
    - Parse all workflow steps in sequence
    - Extract role assignments for each step
    - Capture approval/rejection paths
+   - **NEW: For each workflow step, extract technical details:**
+     * **technicalDetails** - Service calls, API endpoints, database operations, rulebase references (e.g., "rbCheckValidation"), transformations, error handling
+     * **inputParameters** - Parse <ActualParameters> or <InputData> into JSON format: {"paramName": {"type": "String", "required": true, "description": "..."}}
+     * **outputParameters** - Parse output variables into JSON format: {"resultName": {"type": "Boolean", "description": "..."}}
 
 6. **Data Quality:**
    - Extract match rules, merge rules, survivorship rules
@@ -136,6 +150,8 @@ Return ONLY valid JSON using this structure:
       "businessImpact": "From <ErrorMessage> or impact description",
       "ruleCategory": "validation|quality|calculation",
       "businessOwner": "From <Owner> or <Steward>",
+      "technicalImplementation": "Technical details: validation regex patterns, API endpoints called, service names, error codes, data transformation logic, calculation formulas with actual syntax",
+      "validationCriteria": "Test scenarios for validation: example valid inputs with expected outcomes, example invalid inputs with expected error codes and messages",
       "confidence": 0.95
     }
   ],
@@ -157,7 +173,10 @@ Return ONLY valid JSON using this structure:
           "action": "From <Action> or <Activity>",
           "input": "From <InputData>",
           "output": "From <OutputData>",
-          "nextStep": "From <Transition target='...'>"
+          "nextStep": "From <Transition target='...'>",
+          "technicalDetails": "Technical implementation: API/service calls, database operations, transformations, rulebases invoked, error handling mechanisms",
+          "inputParameters": "JSON string with structured input specs: {\"paramName\": {\"type\": \"String\", \"required\": true, \"description\": \"...\"}}",
+          "outputParameters": "JSON string with structured output specs: {\"resultName\": {\"type\": \"Boolean\", \"description\": \"...\"}}"
         }
       ],
       "confidence": 0.95

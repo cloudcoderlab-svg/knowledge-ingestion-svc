@@ -9,8 +9,16 @@ import lombok.NoArgsConstructor;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
+/**
+ * Entity representing a project.
+ *
+ * <p>Stores project metadata for organizing and categorizing subjects. Projects can contain
+ * multiple subjects.
+ *
+ * <p>Table: knowledge.projects
+ */
 @Entity
-@Table(name = "projects")
+@Table(name = "projects", schema = "knowledge")
 @Data
 @Builder
 @NoArgsConstructor
@@ -24,10 +32,10 @@ public class ProjectEntity {
   @Column(name = "project_name", nullable = false)
   private String projectName;
 
-  @Column(name = "source_bucket", nullable = false)
+  @Column(name = "source_bucket")
   private String sourceBucket;
 
-  @Column(name = "gcs_prefix", nullable = false)
+  @Column(name = "gcs_prefix")
   private String gcsPrefix;
 
   @Column(name = "created_at")

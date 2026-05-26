@@ -11,8 +11,19 @@ import lombok.NoArgsConstructor;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.Type;
 
+/**
+ * Entity representing a business rule.
+ *
+ * <p>Stores business rules, policies, constraints, validations, and decision-making criteria
+ * extracted from documentation. Includes condition-outcome pairs and vector embeddings for semantic
+ * search.
+ *
+ * <p>Table: knowledge.knowledge_business_rules
+ *
+ * <p>Examples: validation rules, approval policies, pricing constraints
+ */
 @Entity
-@Table(name = "knowledge_business_rules")
+@Table(name = "knowledge_business_rules", schema = "knowledge")
 @Data
 @Builder
 @NoArgsConstructor
@@ -57,6 +68,12 @@ public class KnowledgeBusinessRuleEntity {
   @Column(name = "embedding")
   @Type(VectorType.class)
   private String embedding; // pgvector handled by custom UserType
+
+  @Column(name = "technical_implementation", columnDefinition = "text")
+  private String technicalImplementation;
+
+  @Column(name = "validation_criteria", columnDefinition = "text")
+  private String validationCriteria;
 
   @Column(name = "created_at")
   @CreationTimestamp

@@ -9,10 +9,22 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.annotations.Type;
+import org.hibernate.type.SqlTypes;
 
+/**
+ * Entity representing a system integration.
+ *
+ * <p>Stores information about system integrations, external service connections, message queues,
+ * webhooks, and other integration points described in documentation.
+ *
+ * <p>Table: knowledge.knowledge_integrations
+ *
+ * <p>Examples: Kafka integration, Stripe payment gateway, SendGrid email service
+ */
 @Entity
-@Table(name = "knowledge_integrations")
+@Table(name = "knowledge_integrations", schema = "knowledge")
 @Data
 @Builder
 @NoArgsConstructor
@@ -50,6 +62,10 @@ public class KnowledgeIntegrationEntity {
 
   @Column(name = "description", columnDefinition = "text")
   private String description;
+
+  @JdbcTypeCode(SqlTypes.JSON)
+  @Column(name = "metadata", columnDefinition = "jsonb")
+  private String metadata;
 
   @Column(name = "confidence")
   private Double confidence;

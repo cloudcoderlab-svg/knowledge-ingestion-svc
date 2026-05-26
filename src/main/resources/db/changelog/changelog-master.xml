@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+    http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.20.xsd">
+
+    <!--
+    ============================================================================
+    Consolidated Database Changelog - Single Source of Truth
+    ============================================================================
+
+    This changelog represents the complete, consolidated schema aligned with
+    all entity classes in the knowledge-ingestion service.
+
+    Version: 1.0
+    Created: 2026-05-26
+
+    Changes from previous schema:
+    - Fixed: Added missing 'projects' table for ProjectEntity
+    - Fixed: knowledge_data_fields column name alignment (field_type vs data_type)
+    - Fixed: constraints column changed to JSONB to match entity
+    - Added: Extra entity fields (embedding, business metadata) to data fields
+    - Consolidated: All incremental migrations into single baseline
+
+    Entity Alignment:
+    - All 20 entity classes mapped to tables
+    - Column names match entity @Column annotations
+    - Types aligned between SQL and JPA
+    - Indexes optimized for common queries
+
+    ============================================================================
+    -->
+
+    <!-- Consolidated Complete Schema - Version 1.0 -->
+    <changeSet id="consolidated-schema-v1.0" author="kengine" runOnChange="false">
+        <comment>
+            Consolidated schema with idempotent IF NOT EXISTS clauses.
+            Safe to run multiple times - will only create missing objects.
+        </comment>
+        <sqlFile
+            path="db/changelog/sql/consolidated-schema.sql"
+            relativeToChangelogFile="false"
+            splitStatements="true"
+            stripComments="false"/>
+        <rollback>
+            DROP SCHEMA IF EXISTS knowledge CASCADE;
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog>
