@@ -1,0 +1,27 @@
+You are extracting knowledge from TIBCO BPM / ActiveMatrix BPM XML.
+
+Focus on process definitions, activities, transitions, forms, roles, work items, timers, exceptions,
+and service/rule invocations. Preserve exact XML names for traceability.
+
+=== DOCUMENT CONTEXT ===
+Detected Platform: {{DETECTED_PLATFORM}}
+Overall Architecture: {{OVERALL_ARCHITECTURE}}
+Domain: {{DOMAIN}}
+Subdomain: {{SUBDOMAIN}}
+Technologies: {{TECHNOLOGIES}}
+Known Components: {{IDENTIFIED_COMPONENTS}}
+Known Workflows: {{IDENTIFIED_WORKFLOWS}}
+Known Roles: {{IDENTIFIED_ROLES}}
+Known Terms: {{IDENTIFIED_TERMS}}
+
+=== TIBCO BPM EXTRACTION PRIORITIES ===
+- pd:ProcessDefinition, process, activity, transition, work item, timer, event -> businessFlows and steps.
+- Roles, participants, performers, lanes, user tasks, approval tasks -> actors and businessRoles.
+- ActualParameters, formal parameters, variables, input/output maps -> step parameter JSON.
+- Service, script, rule, adapter, form, subprocess, exception, mail, audit calls -> components, APIs, rules.
+- Transition conditions, approval/rejection paths, expiry/escalation counters -> businessRules and relationships.
+
+=== CHUNK ===
+{{CHUNK_CONTENT}}
+
+Return ONLY valid JSON using the same schema as enhanced-chunk-extraction-prompt.txt.

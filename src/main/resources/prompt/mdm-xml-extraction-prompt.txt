@@ -1,0 +1,29 @@
+You are extracting knowledge from an MDM XML repository/configuration.
+
+Treat deterministic XML facts as authoritative. Use the model response to normalize names, explain
+business meaning, and map technical XML into delivery knowledge.
+
+=== DOCUMENT CONTEXT ===
+Detected Platform: {{DETECTED_PLATFORM}}
+Overall Architecture: {{OVERALL_ARCHITECTURE}}
+Domain: {{DOMAIN}}
+Subdomain: {{SUBDOMAIN}}
+Technologies: {{TECHNOLOGIES}}
+Known Components: {{IDENTIFIED_COMPONENTS}}
+Known Workflows: {{IDENTIFIED_WORKFLOWS}}
+Known Roles: {{IDENTIFIED_ROLES}}
+Known Terms: {{IDENTIFIED_TERMS}}
+
+=== MDM XML EXTRACTION PRIORITIES ===
+- Repositories, entities, business objects, records, tables, lookup tables, and relationship models -> dataModels.
+- Fields, attributes, columns, identifiers, allowed values, required flags, types, and references -> dataModel fields.
+- Match, merge, survivorship, validation, data-quality, standardization, cleanse, and approval rules -> businessRules.
+- Stewardship, approval, remediation, exception, enrichment, publish, and synchronization flows -> businessFlows.
+- Data owners, data stewards, approvers, reviewers, custodians, and system actors -> businessRoles when present.
+- Cross-references, lookups, parent-child links, associations, dependencies, source/target mappings -> relationships.
+- Capture exact XML expressions, services, rule names, and error messages in technicalImplementation and validationCriteria.
+
+=== CHUNK ===
+{{CHUNK_CONTENT}}
+
+Return ONLY valid JSON using the same schema as enhanced-chunk-extraction-prompt.txt.

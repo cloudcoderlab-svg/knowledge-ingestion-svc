@@ -1,0 +1,140 @@
+package com.kengine.knowledge.service;
+
+import com.kengine.knowledge.dto.ProcessResponse;
+import com.kengine.knowledge.entity.ProcessTrackingEntity;
+import com.kengine.knowledge.ingestion.service.CrossDocumentRelationshipService;
+import com.kengine.knowledge.ingestion.service.KnowledgeChunkGenerationService;
+import com.kengine.knowledge.ingestion.service.PlanningGenerationService;
+import com.kengine.knowledge.ingestion.service.ProjectKnowledgeResetService;
+import com.kengine.knowledge.repository.ProcessTrackingRepository;
+import java.time.OffsetDateTime;
+import java.util.List;
+import java.util.UUID;
+import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Service;
+
+@Service
+@RequiredArgsConstructor
+public class ProcessingService {
+  private final ProjectService projectService;
+  private final ProcessTrackingRepository processRepository;
+  private final GcsProjectFileService fileService;
+  private final IngestionProcessRunner ingestionProcessRunner;
+  private final CrossDocumentRelationshipService crossDocumentRelationshipService;
+  private final KnowledgeChunkGenerationService knowledgeChunkGenerationService;
+  private final PlanningGenerationService planningGenerationService;
+  private final ProjectKnowledgeResetService projectKnowledgeResetService;
+
+  @Value("${gcp.storage.bucket-name}")
+  private String defaultBucket;
+
+  public ProcessResponse startIngestion(UUID projectId) {
+    var project = projectService.find(projectId);
+    ProcessTrackingEntity process =
+        processRepository.save(
+            ProcessTrackingEntity.builder()
+                .projectId(projectId)
+                .processType("PROJECT_INGESTION")
+                .status("RUNNING")
+                .totalFiles(0)
+                .processedFiles(0)
+                .failedFiles(0)
+                .startedAt(OffsetDateTime.now())
+                .build());
+    List<String> files =
+        fileService.listFiles(projectId).stream()
+            .filter(file -> !file.endsWith("/"))
+            .filter(file -> !file.endsWith("definition.md"))
+            .toList();
+    process.setTotalFiles(files.size());
+    process.setFileList(toJsonArray(files));
+    processRepository.save(process);
+
+    ingestionProcessRunner.runIngestion(
+        process.getProcessId(),
+        projectId,
+        project.getSourceBucket() == null ? defaultBucket : project.getSourceBucket(),
+        files);
+    return toResponse(process);
+  }
+
+  public ProcessResponse startConsolidation(UUID projectId) {
+    var project = projectService.find(projectId);
+    ProcessTrackingEntity process =
+        processRepository.save(
+            ProcessTrackingEntity.builder()
+                .projectId(projectId)
+                .processType("CROSS_DOCUMENT_CONSOLIDATION")
+                .status("RUNNING")
+                .startedAt(OffsetDateTime.now())
+                .build());
+    try {
+      crossDocumentRelationshipService.analyzeAndInferRelationships(
+          projectId, project.getProjectName());
+      int knowledgeChunks = knowledgeChunkGenerationService.refreshKnowledgeChunks(projectId);
+      process.setProcessedFiles(knowledgeChunks);
+      process.setStatus("COMPLETED");
+    } catch (Exception e) {
+      process.setStatus("FAILED");
+      process.setFailureCause(e.getMessage());
+    }
+    process.setCompletedAt(OffsetDateTime.now());
+    processRepository.save(process);
+    return toResponse(process);
+  }
+
+  public ProcessResponse startPlanning(UUID projectId) {
+    projectService.find(projectId);
+    ProcessTrackingEntity process =
+        processRepository.save(
+            ProcessTrackingEntity.builder()
+                .projectId(projectId)
+                .processType("PLANNING_GENERATION")
+                .status("RUNNING")
+                .startedAt(OffsetDateTime.now())
+                .build());
+    try {
+      projectKnowledgeResetService.resetPlanningData(projectId);
+      int generated = planningGenerationService.generate(projectId);
+      process.setProcessedFiles(generated);
+      process.setStatus("COMPLETED");
+    } catch (Exception e) {
+      process.setStatus("FAILED");
+      process.setFailureCause(e.getMessage());
+    }
+    process.setCompletedAt(OffsetDateTime.now());
+    processRepository.save(process);
+    return toResponse(process);
+  }
+
+  public List<ProcessResponse> list(UUID projectId) {
+    projectService.find(projectId);
+    return processRepository.findByProjectIdOrderByCreatedAtDesc(projectId).stream()
+        .map(this::toResponse)
+        .toList();
+  }
+
+  private ProcessResponse toResponse(ProcessTrackingEntity process) {
+    return new ProcessResponse(
+        process.getProcessId(),
+        process.getProjectId(),
+        process.getProcessType(),
+        process.getStatus(),
+        process.getTotalFiles(),
+        process.getProcessedFiles(),
+        process.getFailedFiles(),
+        process.getCurrentFile(),
+        process.getFailureCause(),
+        process.getStartedAt(),
+        process.getCompletedAt(),
+        process.getCreatedAt(),
+        process.getUpdatedAt());
+  }
+
+  private String toJsonArray(List<String> values) {
+    return "[\""
+        + String.join("\",\"", values.stream().map(v -> v.replace("\"", "\\\"")).toList())
+        + "\"]";
+  }
+}

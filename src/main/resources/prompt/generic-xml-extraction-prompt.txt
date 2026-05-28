@@ -1,0 +1,29 @@
+You are extracting knowledge from a generic XML configuration/document.
+
+Use deterministic XML structure first: element names, attributes, namespaces, parent-child nesting,
+references, ids, names, source/target attributes, input/output parameters, and text nodes. Do not
+invent a platform. If the XML does not match a known product, keep platform as GENERIC_XML.
+
+=== DOCUMENT CONTEXT ===
+Detected Platform: {{DETECTED_PLATFORM}}
+Overall Architecture: {{OVERALL_ARCHITECTURE}}
+Domain: {{DOMAIN}}
+Subdomain: {{SUBDOMAIN}}
+Technologies: {{TECHNOLOGIES}}
+Known Components: {{IDENTIFIED_COMPONENTS}}
+Known Workflows: {{IDENTIFIED_WORKFLOWS}}
+Known Terms: {{IDENTIFIED_TERMS}}
+
+=== XML EXTRACTION PRIORITIES ===
+- Convert named elements and reusable configuration blocks into technicalComponents.
+- Convert schema-like structures, entities, tables, records, fields, columns, and attributes into dataModels and fields.
+- Convert validation, condition, rule, constraint, policy, and check elements into businessRules.
+- Convert process, workflow, task, activity, step, and transition elements into businessFlows and steps.
+- Convert source/target, from/to, parent/child, link, relation, association, and transition references into relationships.
+- Preserve exact XML names and ids in entity names. Put raw technical detail in technicalImplementation.
+- Use confidence 0.85-0.95 for facts directly supported by XML attributes/elements.
+
+=== CHUNK ===
+{{CHUNK_CONTENT}}
+
+Return ONLY valid JSON using the same schema as enhanced-chunk-extraction-prompt.txt.

@@ -1,0 +1,26 @@
+You are extracting knowledge from TIBCO BusinessWorks XML.
+
+Focus on integration flows, starters, activities, adapters, service calls, transformations,
+schemas, error handlers, and endpoint dependencies.
+
+=== DOCUMENT CONTEXT ===
+Detected Platform: {{DETECTED_PLATFORM}}
+Overall Architecture: {{OVERALL_ARCHITECTURE}}
+Domain: {{DOMAIN}}
+Subdomain: {{SUBDOMAIN}}
+Technologies: {{TECHNOLOGIES}}
+Known Components: {{IDENTIFIED_COMPONENTS}}
+Known Workflows: {{IDENTIFIED_WORKFLOWS}}
+Known Terms: {{IDENTIFIED_TERMS}}
+
+=== TIBCO BW EXTRACTION PRIORITIES ===
+- ProcessDefinition, starter, activity, transition, group, subprocess -> businessFlows and steps.
+- HTTP/JMS/SOAP/REST/file/database adapters, services, endpoints -> APIs/integrations/components.
+- Mapper, XPath, coercions, schemas, input/output bindings -> dataModels and parameter details.
+- Error handlers, retries, timeout, compensation, fault paths -> businessRules and relationships.
+- Source/target transitions and service dependencies -> relationships.
+
+=== CHUNK ===
+{{CHUNK_CONTENT}}
+
+Return ONLY valid JSON using the same schema as enhanced-chunk-extraction-prompt.txt.

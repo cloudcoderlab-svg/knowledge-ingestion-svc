@@ -1,46 +1,48 @@
-# Development Profile Configuration
-
 server:
-  port: 8086
+  port: 8087
+
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+    enabled: true
+  swagger-ui:
+    path: /swagger-ui.html
+    enabled: true
+    operations-sorter: alpha
+    tags-sorter: alpha
 
 spring:
+  application:
+    name: knowledge_engine_svc
   datasource:
     url: jdbc:postgresql://10.196.140.215:5432/kengine-db
-    username: kengine_app
-    password: Admin@123
-    hikari:
-      maximum-pool-size: 10
-      minimum-idle: 5
-      connection-timeout: 30000
+    username: ${KENGINE_DB_USER:kengine_app}
+    password: ${KENGINE_DB_PASSWORD:Admin@123}
   jpa:
     database-platform: org.hibernate.dialect.PostgreSQLDialect
     hibernate:
-      ddl-auto: none  # Liquibase manages schema
-    show-sql: true  # Enable SQL logging in dev
+      ddl-auto: none
     open-in-view: false
+    show-sql: false
     properties:
       hibernate:
         format_sql: true
-        use_sql_comments: true  # Enable SQL comments in dev
         jdbc:
           batch_size: 50
           fetch_size: 50
         order_inserts: true
         order_updates: true
   liquibase:
-    # Use consolidated schema with idempotent IF NOT EXISTS clauses
     change-log: classpath:/db/changelog/changelog-master.xml
     liquibase-schema: public
     default-schema: knowledge
-    # Idempotent configuration - safe to run multiple times
-    drop-first: false  # Set to true to drop and recreate schema on startup (DANGER!)
+    drop-first: false
     enabled: true
 
-# Development settings
 gcp:
   project-id: gpc-d-disc
   storage:
-    bucket-name: kengine-knowledge-artifacts
+    bucket-name: knowledge-resources-storage
 
 vertex:
   project-id: gpc-d-disc
@@ -48,12 +50,12 @@ vertex:
   classification-model-name: gemini-2.5-flash
   embedding-model-name: text-embedding-005
 
-ingestion:
+knowledge-engine:
   chunk:
     max-chars: 3000
     overlap-chars: 300
   parser:
-    multimodal-types: pdf,png,jpg,jpeg,docx,pptx
+    multimodal-types: pdf,png,jpg,jpeg,gif,bmp,webp,doc,docx,ppt,pptx,xls,xlsx
     use-multimodal: true
     max-document-size-mb: 50
   extraction:
@@ -62,13 +64,5 @@ ingestion:
   knowledge-graph:
     enable-persistence: true
     batch-size: 100
-
-# Development logging
-logging:
-  level:
-    root: INFO
-    com.kengine: DEBUG
-    org.springframework.web: DEBUG
-    org.hibernate.SQL: DEBUG
-    org.hibernate.type.descriptor.sql.BasicBinder: TRACE
-    liquibase: DEBUG
+  object-layout:
+    project-prefix-template: "projects/{projectName}/"

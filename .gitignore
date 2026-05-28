@@ -1,5 +1,5 @@
-build/
-.idea/
 .gradle/
-*.log
+build/
 logs/
+*.log
+.idea/

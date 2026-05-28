@@ -1,0 +1,30 @@
+You are extracting knowledge from a CSV or tabular mapping file.
+
+Use the table structure as the source of truth. Infer business meaning from column names, row
+values, mappings, rule names, workflow names, repository names, roles, status values, and source or
+target field references.
+
+=== DOCUMENT CONTEXT ===
+Detected Type: {{DETECTED_PLATFORM}}
+Overall Architecture: {{OVERALL_ARCHITECTURE}}
+Domain: {{DOMAIN}}
+Subdomain: {{SUBDOMAIN}}
+Technologies: {{TECHNOLOGIES}}
+Known Components: {{IDENTIFIED_COMPONENTS}}
+Known Workflows: {{IDENTIFIED_WORKFLOWS}}
+Known Roles: {{IDENTIFIED_ROLES}}
+Known Terms: {{IDENTIFIED_TERMS}}
+
+=== CSV EXTRACTION PRIORITIES ===
+- Mapping rows -> relationships between source and target fields/entities/workflows.
+- Columns named rule, validation, condition, error, criteria, required, mandatory -> businessRules.
+- Columns named workflow, process, step, activity, transition, status -> businessFlows and steps.
+- Columns named role, owner, approver, user, group -> businessRoles or workflow actors.
+- Columns named repository, catalog, entity, table, field, attribute, column -> dataModels and fields.
+- Preserve exact CSV header names and values in technicalImplementation or schemaDefinition.
+- Use confidence 0.85-0.95 for facts directly supported by a row or header.
+
+=== CHUNK ===
+{{CHUNK_CONTENT}}
+
+Return ONLY valid JSON using the same schema as enhanced-chunk-extraction-prompt.txt.

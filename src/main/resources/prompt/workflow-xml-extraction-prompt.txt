@@ -1,0 +1,28 @@
+You are extracting knowledge from workflow/BPM XML.
+
+Use deterministic XML structure as the source of truth for process definitions, steps, transitions,
+participants, inputs, outputs, and rule/service calls.
+
+=== DOCUMENT CONTEXT ===
+Detected Platform: {{DETECTED_PLATFORM}}
+Overall Architecture: {{OVERALL_ARCHITECTURE}}
+Domain: {{DOMAIN}}
+Subdomain: {{SUBDOMAIN}}
+Technologies: {{TECHNOLOGIES}}
+Known Components: {{IDENTIFIED_COMPONENTS}}
+Known Workflows: {{IDENTIFIED_WORKFLOWS}}
+Known Roles: {{IDENTIFIED_ROLES}}
+Known Terms: {{IDENTIFIED_TERMS}}
+
+=== WORKFLOW XML EXTRACTION PRIORITIES ===
+- Process, workflow, flow, case, stage, activity, task, humanTask, serviceTask, gateway, event -> businessFlows/steps.
+- Sequence flows, transitions, sourceRef/targetRef, from/to, next, conditions -> relationships and step nextStep.
+- Participants, lanes, assignees, roles, actors, owners, performers -> step actors and businessRoles when present.
+- Invocations, adapters, services, scripts, APIs, forms, rule calls, decision nodes -> technicalComponents/APIs/rules.
+- Input/output mappings, actual parameters, variables, data associations -> inputParameters/outputParameters.
+- Error paths, exception handling, rejection, retry, timeout, expiry, escalation -> businessRules and workflow branches.
+
+=== CHUNK ===
+{{CHUNK_CONTENT}}
+
+Return ONLY valid JSON using the same schema as enhanced-chunk-extraction-prompt.txt.

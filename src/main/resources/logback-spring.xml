@@ -2,83 +2,17 @@
 <configuration>
   <include resource="org/springframework/boot/logging/logback/defaults.xml"/>
 
-  <springProfile name="dev,local,default">
-    <!-- Console Appender for local development -->
-    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
-      <encoder>
-        <pattern>%d{yyyy-MM-dd'T'HH:mm:ss.SSSXXX} %highlight(%-5level) %cyan(%logger{36}) - %msg%n</pattern>
-      </encoder>
-    </appender>
-
-    <root level="INFO">
-      <appender-ref ref="CONSOLE"/>
-    </root>
-
-    <logger name="com.kengine" level="DEBUG"/>
-    <logger name="liquibase" level="INFO"/>
-    <logger name="org.springframework" level="INFO"/>
-    <logger name="com.zaxxer.hikari" level="INFO"/>
-  </springProfile>
-
-  <springProfile name="prod,staging,qa,stress">
-    <!-- JSON Structured Logging for Cloud Logging / Stackdriver -->
-    <appender name="JSON_CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
-      <encoder class="net.logstash.logback.encoder.LogstashEncoder">
-        <includeContext>true</includeContext>
-        <includeMdc>true</includeMdc>
-        <includeCallerData>false</includeCallerData>
-        <fieldNames>
-          <timestamp>timestamp</timestamp>
-          <version>[ignore]</version>
-          <levelValue>[ignore]</levelValue>
-        </fieldNames>
-        <customFields>{"service":"knowledge-ingestion-svc"}</customFields>
-      </encoder>
-    </appender>
-
-    <!-- Cloud Logging / Stackdriver Appender -->
-    <appender name="CLOUD_LOGGING" class="com.google.cloud.logging.logback.LoggingAppender">
-      <log>knowledge-ingestion-svc.log</log>
-      <resourceType>k8s_container</resourceType>
-      <flushLevel>WARN</flushLevel>
-    </appender>
-
-    <!-- Async wrapper for better performance -->
-    <appender name="ASYNC_CLOUD" class="ch.qos.logback.classic.AsyncAppender">
-      <queueSize>512</queueSize>
-      <discardingThreshold>0</discardingThreshold>
-      <appender-ref ref="CLOUD_LOGGING"/>
-    </appender>
-
-    <root level="INFO">
-      <appender-ref ref="JSON_CONSOLE"/>
-      <appender-ref ref="ASYNC_CLOUD"/>
-    </root>
-
-    <logger name="com.kengine" level="INFO"/>
-    <logger name="liquibase" level="INFO"/>
-    <logger name="org.springframework" level="WARN"/>
-    <logger name="com.zaxxer.hikari" level="WARN"/>
-    <logger name="com.google.cloud" level="INFO"/>
-  </springProfile>
-
-  <!-- Error logging to separate file for all profiles -->
-  <appender name="ERROR_FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
-    <file>logs/error.log</file>
-    <filter class="ch.qos.logback.classic.filter.ThresholdFilter">
-      <level>ERROR</level>
-    </filter>
+  <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
     <encoder>
-      <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
+      <pattern>%d{yyyy-MM-dd'T'HH:mm:ss.SSSXXX} %-5level %logger{36} - %msg%n</pattern>
     </encoder>
-    <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
-      <fileNamePattern>logs/error.%d{yyyy-MM-dd}.log</fileNamePattern>
-      <maxHistory>30</maxHistory>
-      <totalSizeCap>1GB</totalSizeCap>
-    </rollingPolicy>
   </appender>
 
-  <root>
-    <appender-ref ref="ERROR_FILE"/>
+  <root level="INFO">
+    <appender-ref ref="CONSOLE"/>
   </root>
+
+  <logger name="com.kengine" level="DEBUG"/>
+  <logger name="liquibase" level="INFO"/>
 </configuration>
+

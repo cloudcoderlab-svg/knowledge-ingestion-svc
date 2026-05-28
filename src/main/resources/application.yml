@@ -1,5 +1,15 @@
 server:
-  port: 8086
+  port: 8087
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      probes:
+        enabled: true
 
 springdoc:
   api-docs:
@@ -10,23 +20,20 @@ springdoc:
     enabled: true
     operations-sorter: alpha
     tags-sorter: alpha
-    display-request-duration: true
-    show-extensions: true
-    display-operation-id: true
-    default-models-expand-depth: 1
-    default-model-expand-depth: 1
 
 spring:
+  application:
+    name: knowledge_engine_svc
   datasource:
-    url: jdbc:postgresql://${KENGINE_DB_HOST:localhost}:${KENGINE_DB_PORT:5432}/${KENGINE_DB_NAME:kengine-db}
-    username: ${KENGINE_DB_USER:kengine-app}
-    password: ${KENGINE_DB_PASSWORD:}
+    url: jdbc:postgresql://${KENGINE_DB_HOST:34.58.46.227}:5432/kengine-db
+    username: ${KENGINE_DB_USER:kengine_app}
+    password: ${KENGINE_DB_PASSWORD:Admin@123}
   jpa:
     database-platform: org.hibernate.dialect.PostgreSQLDialect
     hibernate:
-      ddl-auto: none  # Liquibase manages schema
+      ddl-auto: none
+    open-in-view: false
     show-sql: false
-    open-in-view: false  # Disable to prevent lazy loading issues
     properties:
       hibernate:
         format_sql: true
@@ -35,28 +42,17 @@ spring:
           fetch_size: 50
         order_inserts: true
         order_updates: true
-        query:
-          in_clause_parameter_padding: true
   liquibase:
-    # Use consolidated schema with idempotent IF NOT EXISTS clauses
     change-log: classpath:/db/changelog/changelog-master.xml
     liquibase-schema: public
     default-schema: knowledge
-    # Idempotent configuration - safe to run multiple times
     drop-first: false
-    # Run on startup to ensure schema exists
     enabled: true
-
-cloudsql:
-  instance-id: appdata-inst-001
-  database: kengine-db
-  schema: public
-  user: kengine-app
 
 gcp:
   project-id: app-lab-001
   storage:
-    bucket-name: kengine-knowledge-artifacts
+    bucket-name: knowledge-resources-storage
 
 vertex:
   project-id: ai-lab-001-494218
@@ -64,12 +60,12 @@ vertex:
   classification-model-name: gemini-2.5-flash
   embedding-model-name: text-embedding-005
 
-ingestion:
+knowledge-engine:
   chunk:
     max-chars: 3000
     overlap-chars: 300
   parser:
-    multimodal-types: pdf,png,jpg,jpeg,docx,pptx
+    multimodal-types: pdf,png,jpg,jpeg,gif,bmp,webp,doc,docx,ppt,pptx,xls,xlsx
     use-multimodal: true
     max-document-size-mb: 50
   extraction:
@@ -78,3 +74,5 @@ ingestion:
   knowledge-graph:
     enable-persistence: true
     batch-size: 100
+  object-layout:
+    project-prefix-template: "projects/{projectName}/"
