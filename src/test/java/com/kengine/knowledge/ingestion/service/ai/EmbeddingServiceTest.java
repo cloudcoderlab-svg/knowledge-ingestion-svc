@@ -14,7 +14,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 class EmbeddingServiceTest {
 
   @Test
-  void returnsNullAndActivatesCooldownWhenQuotaIsExhausted() {
+  void returnsNullAndActivatesCooldownWhenQuotaIsExhausted() throws Exception {
     VertexAIService vertexAIService = mock(VertexAIService.class);
     when(vertexAIService.embedding("content"))
         .thenThrow(new RuntimeException("RESOURCE_EXHAUSTED: Quota exceeded"));
@@ -29,18 +29,18 @@ class EmbeddingServiceTest {
   }
 
   @Test
-  void stillThrowsNonQuotaFailures() {
+  void stillThrowsNonQuotaFailures() throws Exception {
     VertexAIService vertexAIService = mock(VertexAIService.class);
     when(vertexAIService.embedding("content")).thenThrow(new RuntimeException("permission denied"));
     EmbeddingService service = new EmbeddingService(vertexAIService);
 
     assertThatThrownBy(() -> service.embedding("content"))
         .isInstanceOf(RuntimeException.class)
-        .hasMessageContaining("permission denied");
+        .hasMessageContaining("Failed to generate embedding");
   }
 
   @Test
-  void mapsFloatEmbeddingsToDoublesWhenQuotaIsAvailable() {
+  void mapsFloatEmbeddingsToDoublesWhenQuotaIsAvailable() throws Exception {
     VertexAIService vertexAIService = mock(VertexAIService.class);
     when(vertexAIService.embedding("content")).thenReturn(List.of(0.25f, 0.5f));
     EmbeddingService service = new EmbeddingService(vertexAIService);

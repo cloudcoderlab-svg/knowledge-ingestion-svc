@@ -16,8 +16,8 @@ spring:
     name: knowledge_engine_svc
   datasource:
     url: jdbc:postgresql://10.196.140.215:5432/kengine-db
-    username: ${KENGINE_DB_USER:kengine_app}
-    password: ${KENGINE_DB_PASSWORD:Admin@123}
+    username: ${KENGINE_DB_USER:*****}
+    password: ${KENGINE_DB_PASSWORD:*****}
   jpa:
     database-platform: org.hibernate.dialect.PostgreSQLDialect
     hibernate:
@@ -38,11 +38,14 @@ spring:
     default-schema: knowledge
     drop-first: false
     enabled: true
+  jackson:
+    deserialization:
+      fail-on-unknown-properties: false
 
 gcp:
   project-id: gpc-d-disc
   storage:
-    bucket-name: knowledge-resources-storage
+    bucket-name: kengine-knowledge-artifacts
 
 vertex:
   project-id: gpc-d-disc

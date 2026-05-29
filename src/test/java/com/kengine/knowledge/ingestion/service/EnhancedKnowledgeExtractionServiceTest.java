@@ -15,7 +15,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 class EnhancedKnowledgeExtractionServiceTest {
 
   @Test
-  void normalizesCommonLlmJsonShapeMismatches() {
+  void normalizesCommonLlmJsonShapeMismatches() throws Exception {
     VertexAIService vertexAIService = mock(VertexAIService.class);
     when(vertexAIService.generate(anyString()))
         .thenReturn(

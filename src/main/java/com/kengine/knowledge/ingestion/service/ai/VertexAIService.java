@@ -10,13 +10,18 @@ import com.google.cloud.vertexai.generativeai.ContentMaker;
 import com.google.cloud.vertexai.generativeai.GenerativeModel;
 import com.google.cloud.vertexai.generativeai.PartMaker;
 import com.google.cloud.vertexai.generativeai.ResponseHandler;
+import io.github.resilience4j.circuitbreaker.CallNotPermittedException;
+import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
+import io.github.resilience4j.retry.annotation.Retry;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
 import java.util.List;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 @Service
+@Slf4j
 public class VertexAIService {
 
   @Value("${vertex.project-id}")
@@ -57,13 +62,23 @@ public class VertexAIService {
     }
   }
 
-  public String generate(String prompt) {
-    return callWithRetry(
-        "Vertex AI",
-        () -> {
-          GenerateContentResponse response = classificationModel.generateContent(prompt);
-          return response.getCandidates(0).getContent().getParts(0).getText();
-        });
+  @CircuitBreaker(name = "vertexai", fallbackMethod = "generateFallback")
+  @Retry(name = "vertexai")
+  public String generate(String prompt) throws Exception {
+    log.debug("Calling Vertex AI for content generation");
+    GenerateContentResponse response = classificationModel.generateContent(prompt);
+    return response.getCandidates(0).getContent().getParts(0).getText();
+  }
+
+  private String generateFallback(String prompt, CallNotPermittedException ex) {
+    log.error("Circuit breaker is OPEN for Vertex AI generation. Service is unavailable.");
+    throw new RuntimeException(
+        "Vertex AI service is currently unavailable. Please try again later.", ex);
+  }
+
+  private String generateFallback(String prompt, Exception ex) {
+    log.error("Failed to generate content with Vertex AI after retries", ex);
+    throw new RuntimeException("Failed to generate content with Vertex AI", ex);
   }
 
   /**
@@ -75,89 +90,73 @@ public class VertexAIService {
    * @param mimeType the MIME type of the data (e.g., "application/pdf", "image/png")
    * @return the generated response text
    */
-  public String generateWithImage(String prompt, byte[] imageData, String mimeType) {
-    return callWithRetry(
-        "Vertex AI multimodal",
-        () -> {
-          Content content =
-              ContentMaker.fromMultiModalData(
-                  prompt, PartMaker.fromMimeTypeAndData(mimeType, imageData));
+  @CircuitBreaker(name = "vertexai", fallbackMethod = "generateWithImageFallback")
+  @Retry(name = "vertexai")
+  public String generateWithImage(String prompt, byte[] imageData, String mimeType)
+      throws Exception {
+    log.debug("Calling Vertex AI for multimodal content generation");
+    Content content =
+        ContentMaker.fromMultiModalData(prompt, PartMaker.fromMimeTypeAndData(mimeType, imageData));
 
-          GenerateContentResponse response = classificationModel.generateContent(content);
-          return ResponseHandler.getText(response);
-        });
+    GenerateContentResponse response = classificationModel.generateContent(content);
+    return ResponseHandler.getText(response);
   }
 
-  public List<Float> embedding(String text) {
-    return callWithRetry(
-        "Vertex AI embedding",
-        () -> {
-          com.google.protobuf.Value instance =
-              com.google.protobuf.Value.newBuilder()
-                  .setStructValue(
-                      com.google.protobuf.Struct.newBuilder()
-                          .putFields(
-                              "content",
-                              com.google.protobuf.Value.newBuilder().setStringValue(text).build()))
-                  .build();
-
-          PredictResponse response =
-              predictionServiceClient.predict(
-                  modelResourceName(),
-                  List.of(instance),
-                  com.google.protobuf.Value.newBuilder().build());
-
-          return response
-              .getPredictions(0)
-              .getStructValue()
-              .getFieldsOrThrow("embeddings")
-              .getStructValue()
-              .getFieldsOrThrow("values")
-              .getListValue()
-              .getValuesList()
-              .stream()
-              .map(value -> (float) value.getNumberValue())
-              .toList();
-        });
+  private String generateWithImageFallback(
+      String prompt, byte[] imageData, String mimeType, CallNotPermittedException ex) {
+    log.error(
+        "Circuit breaker is OPEN for Vertex AI multimodal generation. Service is unavailable.");
+    throw new RuntimeException(
+        "Vertex AI multimodal service is currently unavailable. Please try again later.", ex);
   }
 
-  private <T> T callWithRetry(String operation, ThrowingSupplier<T> supplier) {
-    int attempts = Math.max(1, maxAttempts);
-    long backoff = Math.max(0, initialBackoffMs);
-    Exception last = null;
-    for (int attempt = 1; attempt <= attempts; attempt++) {
-      try {
-        return supplier.get();
-      } catch (Exception e) {
-        last = e;
-        if (attempt == attempts || !isRetryable(e)) {
-          throw new RuntimeException("Failed to call " + operation, e);
-        }
-        sleep(backoff * attempt);
-      }
-    }
-    throw new RuntimeException("Failed to call " + operation, last);
+  private String generateWithImageFallback(
+      String prompt, byte[] imageData, String mimeType, Exception ex) {
+    log.error("Failed to generate multimodal content with Vertex AI after retries", ex);
+    throw new RuntimeException("Failed to generate multimodal content with Vertex AI", ex);
   }
 
-  private boolean isRetryable(Exception exception) {
-    String message = exception.toString();
-    Throwable cause = exception.getCause();
-    while (cause != null) {
-      message += " " + cause;
-      cause = cause.getCause();
-    }
-    return message.contains("UNAVAILABLE")
-        || message.contains("DEADLINE_EXCEEDED")
-        || message.contains("429");
+  @CircuitBreaker(name = "vertexai-embedding", fallbackMethod = "embeddingFallback")
+  @Retry(name = "vertexai-embedding")
+  public List<Float> embedding(String text) throws Exception {
+    log.debug("Calling Vertex AI for embedding generation");
+    com.google.protobuf.Value instance =
+        com.google.protobuf.Value.newBuilder()
+            .setStructValue(
+                com.google.protobuf.Struct.newBuilder()
+                    .putFields(
+                        "content",
+                        com.google.protobuf.Value.newBuilder().setStringValue(text).build()))
+            .build();
+
+    PredictResponse response =
+        predictionServiceClient.predict(
+            modelResourceName(), List.of(instance), com.google.protobuf.Value.newBuilder().build());
+
+    return response
+        .getPredictions(0)
+        .getStructValue()
+        .getFieldsOrThrow("embeddings")
+        .getStructValue()
+        .getFieldsOrThrow("values")
+        .getListValue()
+        .getValuesList()
+        .stream()
+        .map(value -> (float) value.getNumberValue())
+        .toList();
   }
 
-  private void sleep(long millis) {
-    try {
-      Thread.sleep(millis);
-    } catch (InterruptedException e) {
-      Thread.currentThread().interrupt();
-      throw new RuntimeException("Interrupted while waiting to retry Vertex AI call", e);
-    }
+  private List<Float> embeddingFallback(String text, CallNotPermittedException ex) {
+    log.warn(
+        "Circuit breaker is OPEN for Vertex AI embedding. Returning null to allow graceful degradation.");
+    // Return null to allow ingestion to continue without embeddings
+    return null;
+  }
+
+  private List<Float> embeddingFallback(String text, Exception ex) {
+    log.error("Failed to generate embedding with Vertex AI after retries", ex);
+    // Return null to allow ingestion to continue without embeddings
+    return null;
   }
 
   private String apiEndpoint() {
@@ -171,10 +170,5 @@ public class VertexAIService {
     return String.format(
         "projects/%s/locations/%s/publishers/google/models/%s",
         projectId, location, embeddingModelName);
-  }
-
-  @FunctionalInterface
-  private interface ThrowingSupplier<T> {
-    T get() throws Exception;
   }
 }

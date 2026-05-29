@@ -9,7 +9,6 @@ import com.kengine.knowledge.repository.*;
 import jakarta.persistence.EntityManager;
 import java.time.OffsetDateTime;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -380,37 +379,69 @@ public class PostgresStorageService {
             .build());
   }
 
+  /**
+   * Serializes any Java object to a JSON string representation.
+   *
+   * <p>This method ensures all values, including primitive strings, are properly serialized to
+   * valid JSON format. This is critical for PostgreSQL JSONB columns which require properly
+   * formatted JSON strings.
+   *
+   * <p><strong>Important:</strong> String values are serialized as JSON strings (wrapped in
+   * quotes), not as plain text. For example:
+   *
+   * <ul>
+   *   <li>Input: {@code "hello"} → Output: {@code "\"hello\""}
+   *   <li>Input: {@code Map.of("key", "value")} → Output: {@code "{\"key\":\"value\"}"}
+   *   <li>Input: {@code null} → Output: {@code null}
+   * </ul>
+   *
+   * <p><strong>Bug Fix History:</strong> Previously, this method returned plain strings without
+   * JSON serialization, causing PostgreSQL errors like "invalid input syntax for type json". The
+   * fix ensures all values go through Jackson's {@code ObjectMapper.writeValueAsString()}.
+   *
+   * @param value the object to serialize (can be null)
+   * @return JSON string representation, or null if value is null or serialization fails
+   */
   private String toJson(Object value) {
     if (value == null) {
       return null;
     }
-    if (value instanceof String string) {
-      return string;
-    }
-    if (value instanceof Map<?, ?> || value instanceof List<?>) {
-      try {
-        return objectMapper.writeValueAsString(value);
-      } catch (JsonProcessingException e) {
-        return null;
-      }
-    }
+    // Always serialize to valid JSON, even for primitive strings
+    // This prevents PostgreSQL JSONB insertion errors
     try {
       return objectMapper.writeValueAsString(value);
     } catch (JsonProcessingException e) {
-      log.warn("Could not serialize metadata JSON", e);
+      log.warn("Could not serialize value to JSON", e);
       return null;
     }
   }
 
+  /**
+   * Converts null or blank strings to "unknown".
+   *
+   * <p>Used to ensure database columns that don't allow nulls have a safe default value.
+   *
+   * @param value the string to check
+   * @return the original value if non-null and non-blank, otherwise "unknown"
+   */
   private String nullToUnknown(String value) {
     return value == null || value.isBlank() ? "unknown" : value;
   }
 
+  /**
+   * Extracts a short error message from an exception, truncated to 2000 characters.
+   *
+   * <p>If the exception has no message, uses the exception class simple name instead.
+   *
+   * @param exception the exception to extract message from
+   * @return error message truncated to maximum 2000 characters for database storage
+   */
   private String shortMessage(Exception exception) {
     String message = exception.getMessage();
     if (message == null || message.isBlank()) {
       message = exception.getClass().getSimpleName();
     }
+    // Truncate to fit database column size limit
     return message.length() <= 2000 ? message : message.substring(0, 2000);
   }
 }

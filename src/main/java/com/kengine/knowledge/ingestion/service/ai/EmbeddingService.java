@@ -39,13 +39,18 @@ public class EmbeddingService {
     }
 
     try {
-      return vertexAIService.embedding(text).stream().map(Float::doubleValue).toList();
-    } catch (RuntimeException e) {
+      List<Float> result = vertexAIService.embedding(text);
+      // Handle null from circuit breaker fallback
+      if (result == null) {
+        return null;
+      }
+      return result.stream().map(Float::doubleValue).toList();
+    } catch (Exception e) {
       if (isQuotaExhausted(e)) {
         activateQuotaCooldown(e);
         return null;
       }
-      throw e;
+      throw new RuntimeException("Failed to generate embedding", e);
     }
   }
 
@@ -55,7 +60,7 @@ public class EmbeddingService {
   }
 
   /** Starts the cooldown window after a quota exhaustion response. */
-  private void activateQuotaCooldown(RuntimeException exception) {
+  private void activateQuotaCooldown(Exception exception) {
     long cooldown = Math.max(0, quotaCooldownMs);
     quotaCooldownUntilEpochMs = System.currentTimeMillis() + cooldown;
     log.warn(

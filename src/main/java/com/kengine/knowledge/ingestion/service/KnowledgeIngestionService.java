@@ -38,6 +38,7 @@ public class KnowledgeIngestionService {
   private static final Pattern XML_ENCODING_PATTERN =
       Pattern.compile(
           "<\\?xml\\s+[^>]*encoding\\s*=\\s*['\"]([^'\"]+)['\"]", Pattern.CASE_INSENSITIVE);
+  private static final long MAX_DOCUMENT_SIZE_BYTES = 50 * 1024 * 1024; // 50 MB
 
   private final DocumentParserOrchestrator documentParserOrchestrator;
   private final DocumentLevelAnalysisService documentLevelAnalysisService;
@@ -68,6 +69,18 @@ public class KnowledgeIngestionService {
     if (blob == null) {
       throw new IllegalArgumentException("Blob not found: " + objectName);
     }
+
+    // Validate file size before loading into memory
+    Long blobSize = blob.getSize();
+    if (blobSize != null && blobSize > MAX_DOCUMENT_SIZE_BYTES) {
+      throw new IllegalArgumentException(
+          String.format(
+              "Document size (%d bytes) exceeds maximum allowed size (%d bytes)",
+              blobSize, MAX_DOCUMENT_SIZE_BYTES));
+    }
+
+    // Validate object name to prevent path traversal
+    validateObjectName(objectName);
 
     byte[] documentBytes = blob.getContent();
     try (InputStream inputStream = new ByteArrayInputStream(documentBytes)) {
@@ -315,5 +328,23 @@ public class KnowledgeIngestionService {
         || "xpdl".equalsIgnoreCase(fileType)
         || "bpmn".equalsIgnoreCase(fileType)
         || "bpel".equalsIgnoreCase(fileType);
+  }
+
+  /**
+   * Validates object name to prevent path traversal attacks.
+   *
+   * @param objectName the GCS object name to validate
+   * @throws IllegalArgumentException if object name contains path traversal attempts
+   */
+  private void validateObjectName(String objectName) {
+    if (objectName == null || objectName.isBlank()) {
+      throw new IllegalArgumentException("Object name cannot be null or blank");
+    }
+    if (objectName.contains("..") || objectName.contains("//")) {
+      throw new IllegalArgumentException("Object name contains invalid path sequences");
+    }
+    if (!objectName.startsWith("projects/")) {
+      throw new IllegalArgumentException("Object name must start with 'projects/' prefix");
+    }
   }
 }

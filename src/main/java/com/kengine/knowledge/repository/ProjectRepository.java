@@ -10,7 +10,10 @@ import org.springframework.data.repository.query.Param;
 public interface ProjectRepository extends JpaRepository<ProjectEntity, UUID> {
   Optional<ProjectEntity> findByProjectNameAndVersion(String projectName, Integer version);
 
-  Optional<ProjectEntity> findByGcsPrefix(String gcsPrefix);
+  @Query(
+      "SELECT p FROM ProjectEntity p WHERE p.gcsPrefix = :gcsPrefix "
+          + "ORDER BY p.version DESC, p.createdAt DESC LIMIT 1")
+  Optional<ProjectEntity> findByGcsPrefix(@Param("gcsPrefix") String gcsPrefix);
 
   @Query(
       value =
