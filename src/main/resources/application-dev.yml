@@ -64,6 +64,12 @@ knowledge-engine:
   extraction:
     enable-document-level-analysis: true
     enable-entity-embeddings: true
+  ingestion:
+    project-parallelism: 5
+    parallelism: 2
+  project-pipeline:
+    parallelism: 5
+    poll-ms: 1000
   knowledge-graph:
     enable-persistence: true
     batch-size: 100
