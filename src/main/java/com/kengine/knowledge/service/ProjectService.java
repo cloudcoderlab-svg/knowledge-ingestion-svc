@@ -87,12 +87,27 @@ public class ProjectService {
     }
   }
 
+  /**
+   * Called when a project's ingestion process completes successfully.
+   *
+   * <p>This method handles the multi-version lifecycle:
+   *
+   * <ol>
+   *   <li>Marks the project as ACTIVE (for both COMPLETED and PARTIAL_SUCCESS ingestions)
+   *   <li>Allows multiple successfully ingested versions to coexist as ACTIVE
+   *   <li>Suspends only in-progress versions (DRAFT or INGESTING status) to prevent concurrent
+   *       ingestions
+   * </ol>
+   *
+   * @param projectId the UUID of the project that completed ingestion
+   * @param processStatus the final status of the ingestion process (COMPLETED or PARTIAL_SUCCESS)
+   */
   @Transactional
   public void onIngestionSuccess(UUID projectId, String processStatus) {
     ProjectEntity project = find(projectId);
 
     // Mark project as ACTIVE for both COMPLETED and PARTIAL_SUCCESS
-    // Multiple versions can coexist as ACTIVE
+    // Multiple versions can coexist as ACTIVE - this supports having v1, v2, v3 all active
     project.setStatus(ProjectStatus.ACTIVE);
     projectRepository.save(project);
     log.info(
@@ -101,8 +116,9 @@ public class ProjectService {
         project.getVersion(),
         processStatus);
 
-    // Suspend any in-progress/running previous versions
-    // This prevents multiple versions from ingesting simultaneously
+    // Suspend any in-progress/running previous versions (DRAFT or INGESTING)
+    // This prevents multiple versions from ingesting simultaneously while allowing
+    // multiple successfully ingested versions to remain ACTIVE
     List<ProjectEntity> inProgressVersions =
         projectRepository.findAll().stream()
             .filter(
@@ -194,12 +210,30 @@ public class ProjectService {
         process.getUpdatedAt());
   }
 
+  /**
+   * Finds a project by its unique identifier.
+   *
+   * @param projectId the project UUID
+   * @return the project entity
+   * @throws NotFoundException if the project does not exist
+   */
   ProjectEntity find(UUID projectId) {
     return projectRepository
         .findById(projectId)
         .orElseThrow(() -> new NotFoundException("Project not found: " + projectId));
   }
 
+  /**
+   * Finds a project by its name and version number.
+   *
+   * <p>The project name is normalized to kebab-case before lookup, allowing flexible name matching.
+   * For example, "My Project Name" is normalized to "my-project-name".
+   *
+   * @param projectName the project name (will be normalized to kebab-case)
+   * @param version the version number
+   * @return the project entity
+   * @throws NotFoundException if the project version does not exist
+   */
   public ProjectEntity findByNameAndVersion(String projectName, Integer version) {
     String normalizedName = pathService.slug(projectName);
     return projectRepository

@@ -116,6 +116,16 @@ public class ProcessingService {
         .toList();
   }
 
+  /**
+   * Lists all processes for a specific project version identified by name and version.
+   *
+   * <p>The project name is normalized to kebab-case before lookup, allowing flexible name matching.
+   *
+   * @param projectName the project name (will be normalized)
+   * @param version the version number
+   * @return list of processes ordered by creation date (most recent first)
+   * @throws NotFoundException if the project version does not exist
+   */
   public List<ProcessResponse> listByProjectVersion(String projectName, Integer version) {
     var project = projectService.findByNameAndVersion(projectName, version);
     return processRepository.findByProjectIdOrderByCreatedAtDesc(project.getProjectId()).stream()
@@ -123,6 +133,17 @@ public class ProcessingService {
         .toList();
   }
 
+  /**
+   * Gets a processing summary for a specific project version identified by name and version.
+   *
+   * <p>This is a convenience method that looks up the project by name and version, then delegates
+   * to {@link #getProcessingSummary(UUID)}.
+   *
+   * @param projectName the project name (will be normalized)
+   * @param version the version number
+   * @return processing summary with aggregated statistics
+   * @throws NotFoundException if the project version does not exist
+   */
   public ProcessingSummaryResponse getProcessingSummaryByVersion(
       String projectName, Integer version) {
     var project = projectService.findByNameAndVersion(projectName, version);

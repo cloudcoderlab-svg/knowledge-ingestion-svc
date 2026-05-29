@@ -80,12 +80,19 @@ public class IngestionProcessRunner {
                           documentExecutor))
               .toList();
 
+      // Wait for all document processing tasks to complete
       CompletableFuture.allOf(futures.toArray(CompletableFuture[]::new)).join();
+
+      // Determine final process status based on failures
       int failedCount = failed.get();
       long finalBytes = totalBytes.get();
       long finalTokens = totalTokens.get();
       boolean isSuccess = failedCount == 0;
+
+      // COMPLETED: All documents processed successfully
+      // PARTIAL_SUCCESS: Some documents failed but process completed
       String processStatus = isSuccess ? "COMPLETED" : "PARTIAL_SUCCESS";
+
       updateProcess(
           processId,
           process -> {
@@ -98,7 +105,8 @@ public class IngestionProcessRunner {
             process.setCompletedAt(OffsetDateTime.now());
           });
 
-      // Activate project for both successful and partially successful ingestions
+      // Activate project for both COMPLETED and PARTIAL_SUCCESS ingestions
+      // Even with some failed documents, the project can still be marked ACTIVE
       // Multiple versions can coexist as ACTIVE
       try {
         projectService.onIngestionSuccess(projectId, processStatus);
