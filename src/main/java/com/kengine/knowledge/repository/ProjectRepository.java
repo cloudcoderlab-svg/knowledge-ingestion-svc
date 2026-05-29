@@ -1,6 +1,7 @@
 package com.kengine.knowledge.repository;
 
 import com.kengine.knowledge.entity.ProjectEntity;
+import com.kengine.knowledge.entity.ProjectStatus;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -31,4 +32,12 @@ public interface ProjectRepository extends JpaRepository<ProjectEntity, UUID> {
       nativeQuery = true)
   List<ProjectDiscoveryProjection> searchByDefinitionEmbedding(
       @Param("embedding") String embedding, @Param("limit") int limit);
+
+  List<ProjectEntity> findByProjectNameOrderByVersionDesc(String projectName);
+
+  @Query(
+      "SELECT COALESCE(MAX(p.version), 0) FROM ProjectEntity p WHERE p.projectName = :projectName")
+  Integer findMaxVersionByProjectName(@Param("projectName") String projectName);
+
+  List<ProjectEntity> findByProjectNameAndStatusNot(String projectName, ProjectStatus status);
 }

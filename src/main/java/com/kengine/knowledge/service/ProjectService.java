@@ -9,6 +9,7 @@ import com.kengine.knowledge.entity.*;
 import com.kengine.knowledge.exception.NotFoundException;
 import com.kengine.knowledge.ingestion.service.ai.EmbeddingService;
 import com.kengine.knowledge.ingestion.util.EmbeddingUtils;
+import com.kengine.knowledge.repository.ProcessTrackingRepository;
 import com.kengine.knowledge.repository.ProjectRepository;
 import java.util.List;
 import java.util.UUID;
@@ -23,6 +24,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Slf4j
 public class ProjectService {
   private final ProjectRepository projectRepository;
+  private final ProcessTrackingRepository processRepository;
   private final ProjectPathService pathService;
   private final ObjectMapper objectMapper;
   private final Storage storage;
@@ -33,19 +35,27 @@ public class ProjectService {
 
   @Transactional
   public ProjectResponse create(CreateProjectRequest request) {
-    int version = request.version() == null ? 1 : request.version();
-    projectRepository
-        .findByProjectNameAndVersion(request.projectName(), version)
-        .ifPresent(
-            existing -> {
-              throw new IllegalArgumentException("Project name and version already exist");
-            });
-
+    String normalizedName = pathService.slug(request.projectName());
     String sourceBucket = resolveSourceBucket(request.sourceBucket());
-    String gcsPrefix = pathService.projectPrefix(request.projectName());
+    String gcsPrefix = pathService.projectPrefix(normalizedName);
+
+    int version;
+    if (request.version() != null) {
+      version = request.version();
+      projectRepository
+          .findByProjectNameAndVersion(normalizedName, version)
+          .ifPresent(
+              existing -> {
+                throw new IllegalArgumentException("Project name and version already exist");
+              });
+    } else {
+      Integer maxVersion = projectRepository.findMaxVersionByProjectName(normalizedName);
+      version = (maxVersion == null ? 0 : maxVersion) + 1;
+    }
+
     ProjectEntity project =
         ProjectEntity.builder()
-            .projectName(request.projectName())
+            .projectName(normalizedName)
             .version(version)
             .title(request.title())
             .description(request.description())
@@ -61,6 +71,62 @@ public class ProjectService {
     return toResponse(savedProject);
   }
 
+  private void suspendRunningProcesses(UUID projectId) {
+    List<ProcessTrackingEntity> runningProcesses =
+        processRepository.findByProjectIdAndStatus(projectId, "RUNNING");
+
+    for (ProcessTrackingEntity process : runningProcesses) {
+      process.setStatus("SUSPENDED");
+      process.setFailureCause("Process suspended due to new project version launch");
+      process.setCompletedAt(java.time.OffsetDateTime.now());
+      processRepository.save(process);
+    }
+    if (!runningProcesses.isEmpty()) {
+      log.info(
+          "Suspended {} running process(es) for project: {}", runningProcesses.size(), projectId);
+    }
+  }
+
+  @Transactional
+  public void onIngestionSuccess(UUID projectId, String processStatus) {
+    ProjectEntity project = find(projectId);
+
+    // Mark project as ACTIVE for both COMPLETED and PARTIAL_SUCCESS
+    // Multiple versions can coexist as ACTIVE
+    project.setStatus(ProjectStatus.ACTIVE);
+    projectRepository.save(project);
+    log.info(
+        "Project {} (v{}) marked as ACTIVE after {} ingestion",
+        project.getProjectName(),
+        project.getVersion(),
+        processStatus);
+
+    // Suspend any in-progress/running previous versions
+    // This prevents multiple versions from ingesting simultaneously
+    List<ProjectEntity> inProgressVersions =
+        projectRepository.findAll().stream()
+            .filter(
+                p ->
+                    p.getProjectName().equals(project.getProjectName())
+                        && !p.getProjectId().equals(projectId)
+                        && (p.getStatus() == ProjectStatus.DRAFT
+                            || p.getStatus() == ProjectStatus.INGESTING))
+            .toList();
+
+    for (ProjectEntity inProgressProject : inProgressVersions) {
+      inProgressProject.setStatus(ProjectStatus.SUSPENDED);
+      projectRepository.save(inProgressProject);
+      suspendRunningProcesses(inProgressProject.getProjectId());
+    }
+
+    if (!inProgressVersions.isEmpty()) {
+      log.info(
+          "Suspended {} in-progress version(s) of project: {}",
+          inProgressVersions.size(),
+          project.getProjectName());
+    }
+  }
+
   public ProjectResponse get(UUID projectId) {
     return toResponse(find(projectId));
   }
@@ -69,10 +135,78 @@ public class ProjectService {
     return projectRepository.findAll().stream().map(this::toResponse).toList();
   }
 
+  public ProjectStatusSummaryResponse getProjectStatus(String projectName) {
+    String normalizedName = pathService.slug(projectName);
+    List<ProjectEntity> allVersions =
+        projectRepository.findByProjectNameOrderByVersionDesc(normalizedName);
+
+    if (allVersions.isEmpty()) {
+      throw new NotFoundException("Project not found: " + projectName);
+    }
+
+    List<UUID> projectIds = allVersions.stream().map(ProjectEntity::getProjectId).toList();
+    List<ProcessTrackingEntity> allProcesses =
+        processRepository.findByProjectIdInOrderByCreatedAtDesc(projectIds);
+
+    List<ProjectVersionStatusResponse> versionStatuses =
+        allVersions.stream()
+            .map(
+                project -> {
+                  List<ProcessResponse> runningProcesses =
+                      allProcesses.stream()
+                          .filter(p -> p.getProjectId().equals(project.getProjectId()))
+                          .filter(p -> "RUNNING".equals(p.getStatus()))
+                          .map(this::toProcessResponse)
+                          .toList();
+
+                  return new ProjectVersionStatusResponse(
+                      project.getProjectId(),
+                      project.getProjectName(),
+                      project.getVersion(),
+                      project.getTitle(),
+                      project.getStatus(),
+                      project.getSourceBucket(),
+                      runningProcesses,
+                      project.getCreatedAt(),
+                      project.getUpdatedAt());
+                })
+            .toList();
+
+    return new ProjectStatusSummaryResponse(normalizedName, allVersions.size(), versionStatuses);
+  }
+
+  private ProcessResponse toProcessResponse(ProcessTrackingEntity process) {
+    return new ProcessResponse(
+        process.getProcessId(),
+        process.getProjectId(),
+        process.getProcessType(),
+        process.getStatus(),
+        process.getTotalFiles(),
+        process.getProcessedFiles(),
+        process.getFailedFiles(),
+        process.getCurrentFile(),
+        process.getFailureCause(),
+        process.getTotalTokensProcessed(),
+        process.getTotalBytesProcessed(),
+        process.getStartedAt(),
+        process.getCompletedAt(),
+        process.getCreatedAt(),
+        process.getUpdatedAt());
+  }
+
   ProjectEntity find(UUID projectId) {
     return projectRepository
         .findById(projectId)
         .orElseThrow(() -> new NotFoundException("Project not found: " + projectId));
+  }
+
+  public ProjectEntity findByNameAndVersion(String projectName, Integer version) {
+    String normalizedName = pathService.slug(projectName);
+    return projectRepository
+        .findByProjectNameAndVersion(normalizedName, version)
+        .orElseThrow(
+            () ->
+                new NotFoundException("Project not found: " + projectName + " version " + version));
   }
 
   ProjectResponse toResponse(ProjectEntity project) {

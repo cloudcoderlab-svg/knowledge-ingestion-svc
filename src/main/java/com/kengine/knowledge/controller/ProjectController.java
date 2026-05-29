@@ -41,4 +41,9 @@ public class ProjectController {
   public List<String> files(@PathVariable UUID projectId) {
     return fileService.listFiles(projectId);
   }
+
+  @GetMapping("/status/{projectName}")
+  public ProjectStatusSummaryResponse getProjectStatus(@PathVariable String projectName) {
+    return projectService.getProjectStatus(projectName);
+  }
 }

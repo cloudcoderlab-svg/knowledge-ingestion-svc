@@ -18,6 +18,9 @@ public class DataFieldEntity {
   @Column(name = "field_id")
   private UUID fieldId;
 
+  @Column(name = "project_id", nullable = false)
+  private UUID projectId;
+
   @Column(name = "data_model_id", nullable = false)
   private UUID dataModelId;
 

@@ -5,5 +5,6 @@ public enum ProjectStatus {
   INGESTING,
   ACTIVE,
   FAILED,
-  ARCHIVED
+  ARCHIVED,
+  SUSPENDED
 }

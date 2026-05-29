@@ -232,6 +232,8 @@ public class ProjectPipelineService {
         process.getFailedFiles(),
         process.getCurrentFile(),
         process.getFailureCause(),
+        process.getTotalTokensProcessed(),
+        process.getTotalBytesProcessed(),
         process.getStartedAt(),
         process.getCompletedAt(),
         process.getCreatedAt(),

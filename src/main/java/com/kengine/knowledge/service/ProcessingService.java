@@ -1,6 +1,7 @@
 package com.kengine.knowledge.service;
 
 import com.kengine.knowledge.dto.ProcessResponse;
+import com.kengine.knowledge.dto.ProcessingSummaryResponse;
 import com.kengine.knowledge.entity.ProcessTrackingEntity;
 import com.kengine.knowledge.ingestion.service.CrossDocumentRelationshipService;
 import com.kengine.knowledge.ingestion.service.KnowledgeChunkGenerationService;
@@ -115,6 +116,75 @@ public class ProcessingService {
         .toList();
   }
 
+  public List<ProcessResponse> listByProjectVersion(String projectName, Integer version) {
+    var project = projectService.findByNameAndVersion(projectName, version);
+    return processRepository.findByProjectIdOrderByCreatedAtDesc(project.getProjectId()).stream()
+        .map(this::toResponse)
+        .toList();
+  }
+
+  public ProcessingSummaryResponse getProcessingSummaryByVersion(
+      String projectName, Integer version) {
+    var project = projectService.findByNameAndVersion(projectName, version);
+    return getProcessingSummary(project.getProjectId());
+  }
+
+  public ProcessingSummaryResponse getProcessingSummary(UUID projectId) {
+    var project = projectService.find(projectId);
+    List<ProcessTrackingEntity> allProcesses =
+        processRepository.findByProjectIdOrderByCreatedAtDesc(projectId);
+
+    long totalBytes =
+        allProcesses.stream()
+            .filter(p -> p.getTotalBytesProcessed() != null)
+            .mapToLong(ProcessTrackingEntity::getTotalBytesProcessed)
+            .sum();
+
+    long totalTokens =
+        allProcesses.stream()
+            .filter(p -> p.getTotalTokensProcessed() != null)
+            .mapToLong(ProcessTrackingEntity::getTotalTokensProcessed)
+            .sum();
+
+    int completedCount =
+        (int)
+            allProcesses.stream()
+                .filter(
+                    p ->
+                        "COMPLETED".equals(p.getStatus())
+                            || "PARTIAL_SUCCESS".equals(p.getStatus()))
+                .count();
+
+    int failedCount =
+        (int) allProcesses.stream().filter(p -> "FAILED".equals(p.getStatus())).count();
+
+    int runningCount =
+        (int) allProcesses.stream().filter(p -> "RUNNING".equals(p.getStatus())).count();
+
+    OffsetDateTime lastProcessedAt =
+        allProcesses.stream()
+            .filter(p -> p.getCompletedAt() != null)
+            .map(ProcessTrackingEntity::getCompletedAt)
+            .max(OffsetDateTime::compareTo)
+            .orElse(null);
+
+    List<ProcessResponse> recentProcesses =
+        allProcesses.stream().limit(10).map(this::toResponse).toList();
+
+    return new ProcessingSummaryResponse(
+        projectId,
+        project.getProjectName(),
+        project.getVersion(),
+        totalBytes,
+        totalTokens,
+        allProcesses.size(),
+        completedCount,
+        failedCount,
+        runningCount,
+        recentProcesses,
+        lastProcessedAt);
+  }
+
   private ProcessResponse toResponse(ProcessTrackingEntity process) {
     return new ProcessResponse(
         process.getProcessId(),
@@ -126,6 +196,8 @@ public class ProcessingService {
         process.getFailedFiles(),
         process.getCurrentFile(),
         process.getFailureCause(),
+        process.getTotalTokensProcessed(),
+        process.getTotalBytesProcessed(),
         process.getStartedAt(),
         process.getCompletedAt(),
         process.getCreatedAt(),

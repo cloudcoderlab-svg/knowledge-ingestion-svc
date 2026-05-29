@@ -20,6 +20,9 @@ public class WorkflowStepEntity {
   @Column(name = "step_id")
   private UUID stepId;
 
+  @Column(name = "project_id", nullable = false)
+  private UUID projectId;
+
   @Column(name = "workflow_id", nullable = false)
   private UUID workflowId;
 

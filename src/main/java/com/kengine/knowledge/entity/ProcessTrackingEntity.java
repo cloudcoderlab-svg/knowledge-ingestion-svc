@@ -47,6 +47,12 @@ public class ProcessTrackingEntity {
   @Column(name = "failure_cause", columnDefinition = "text")
   private String failureCause;
 
+  @Column(name = "total_tokens_processed")
+  private Long totalTokensProcessed;
+
+  @Column(name = "total_bytes_processed")
+  private Long totalBytesProcessed;
+
   @Column(name = "started_at")
   private OffsetDateTime startedAt;
 

@@ -7,4 +7,6 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface WorkflowStepRepository extends JpaRepository<WorkflowStepEntity, UUID> {
   List<WorkflowStepEntity> findByWorkflowIdOrderBySequenceNumber(UUID workflowId);
+
+  List<WorkflowStepEntity> findByProjectId(UUID projectId);
 }

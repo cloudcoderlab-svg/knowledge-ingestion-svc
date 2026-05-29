@@ -1,5 +1,8 @@
 package com.kengine.knowledge.service;
 
+import com.google.cloud.storage.Blob;
+import com.google.cloud.storage.BlobId;
+import com.google.cloud.storage.Storage;
 import com.kengine.knowledge.entity.ProcessTrackingEntity;
 import com.kengine.knowledge.ingestion.service.KnowledgeIngestionService;
 import com.kengine.knowledge.ingestion.service.ProjectKnowledgeResetService;
@@ -10,6 +13,7 @@ import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.scheduling.annotation.Async;
@@ -22,22 +26,30 @@ public class IngestionProcessRunner {
   private final ProjectKnowledgeResetService projectKnowledgeResetService;
   private final KnowledgeIngestionService ingestionService;
   private final Executor documentExecutor;
+  private final Storage storage;
+  private final ProjectService projectService;
 
   public IngestionProcessRunner(
       ProcessTrackingRepository processRepository,
       ProjectKnowledgeResetService projectKnowledgeResetService,
       KnowledgeIngestionService ingestionService,
-      @Qualifier("ingestionDocumentExecutor") Executor documentExecutor) {
+      @Qualifier("ingestionDocumentExecutor") Executor documentExecutor,
+      Storage storage,
+      ProjectService projectService) {
     this.processRepository = processRepository;
     this.projectKnowledgeResetService = projectKnowledgeResetService;
     this.ingestionService = ingestionService;
     this.documentExecutor = documentExecutor;
+    this.storage = storage;
+    this.projectService = projectService;
   }
 
   @Async("ingestionProcessExecutor")
   public void runIngestion(UUID processId, UUID projectId, String bucketName, List<String> files) {
     AtomicInteger processed = new AtomicInteger();
     AtomicInteger failed = new AtomicInteger();
+    AtomicLong totalBytes = new AtomicLong();
+    AtomicLong totalTokens = new AtomicLong();
     try {
       projectKnowledgeResetService.resetIngestionData(projectId);
       updateProcess(
@@ -47,6 +59,8 @@ public class IngestionProcessRunner {
             process.setProcessedFiles(0);
             process.setFailedFiles(0);
             process.setFailureCause(null);
+            process.setTotalBytesProcessed(0L);
+            process.setTotalTokensProcessed(0L);
           });
 
       List<CompletableFuture<Void>> futures =
@@ -54,21 +68,43 @@ public class IngestionProcessRunner {
               .map(
                   file ->
                       CompletableFuture.runAsync(
-                          () -> processFile(processId, bucketName, file, processed, failed),
+                          () ->
+                              processFile(
+                                  processId,
+                                  bucketName,
+                                  file,
+                                  processed,
+                                  failed,
+                                  totalBytes,
+                                  totalTokens),
                           documentExecutor))
               .toList();
 
       CompletableFuture.allOf(futures.toArray(CompletableFuture[]::new)).join();
       int failedCount = failed.get();
+      long finalBytes = totalBytes.get();
+      long finalTokens = totalTokens.get();
+      boolean isSuccess = failedCount == 0;
+      String processStatus = isSuccess ? "COMPLETED" : "PARTIAL_SUCCESS";
       updateProcess(
           processId,
           process -> {
             process.setProcessedFiles(processed.get());
             process.setFailedFiles(failedCount);
             process.setCurrentFile(null);
-            process.setStatus(failedCount == 0 ? "COMPLETED" : "PARTIAL_SUCCESS");
+            process.setStatus(processStatus);
+            process.setTotalBytesProcessed(finalBytes);
+            process.setTotalTokensProcessed(finalTokens);
             process.setCompletedAt(OffsetDateTime.now());
           });
+
+      // Activate project for both successful and partially successful ingestions
+      // Multiple versions can coexist as ACTIVE
+      try {
+        projectService.onIngestionSuccess(projectId, processStatus);
+      } catch (Exception e) {
+        log.error("Failed to activate project after ingestion: {}", projectId, e);
+      }
     } catch (Exception e) {
       log.error("Ingestion process failed: {}", processId, e);
       updateProcess(
@@ -86,12 +122,24 @@ public class IngestionProcessRunner {
       String bucketName,
       String file,
       AtomicInteger processed,
-      AtomicInteger failed) {
+      AtomicInteger failed,
+      AtomicLong totalBytes,
+      AtomicLong totalTokens) {
     updateProcess(processId, process -> process.setCurrentFile(file));
     try {
+      long fileSize = getFileSize(bucketName, file);
       ingestionService.ingestFromGcs(bucketName, file);
+      totalBytes.addAndGet(fileSize);
+      long currentBytes = totalBytes.get();
+      long currentTokens = totalTokens.get();
       int processedCount = processed.incrementAndGet();
-      updateProcess(processId, process -> process.setProcessedFiles(processedCount));
+      updateProcess(
+          processId,
+          process -> {
+            process.setProcessedFiles(processedCount);
+            process.setTotalBytesProcessed(currentBytes);
+            process.setTotalTokensProcessed(currentTokens);
+          });
     } catch (Exception e) {
       int failedCount = failed.incrementAndGet();
       log.warn("Failed to ingest project file: {}", file, e);
@@ -101,6 +149,16 @@ public class IngestionProcessRunner {
             process.setFailedFiles(failedCount);
             process.setFailureCause(file + ": " + shortMessage(e));
           });
+    }
+  }
+
+  private long getFileSize(String bucketName, String objectName) {
+    try {
+      Blob blob = storage.get(BlobId.of(bucketName, objectName));
+      return blob != null && blob.getSize() != null ? blob.getSize() : 0L;
+    } catch (Exception e) {
+      log.warn("Could not determine file size for {}", objectName, e);
+      return 0L;
     }
   }
 

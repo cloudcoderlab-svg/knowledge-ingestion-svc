@@ -13,6 +13,8 @@ public record ProcessResponse(
     Integer failedFiles,
     String currentFile,
     String failureCause,
+    Long totalTokensProcessed,
+    Long totalBytesProcessed,
     OffsetDateTime startedAt,
     OffsetDateTime completedAt,
     OffsetDateTime createdAt,
