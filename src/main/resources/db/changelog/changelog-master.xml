@@ -13,13 +13,5 @@
             stripComments="false"/>
         <rollback>DROP SCHEMA IF EXISTS knowledge CASCADE;</rollback>
     </changeSet>
-
-    <changeSet id="knowledge-engine-project-schema-align-v2" author="kengine">
-        <sqlFile
-            path="db/changelog/sql/project-schema-align-v2.sql"
-            relativeToChangelogFile="false"
-            splitStatements="true"
-            stripComments="false"/>
-    </changeSet>
 </databaseChangeLog>
 
